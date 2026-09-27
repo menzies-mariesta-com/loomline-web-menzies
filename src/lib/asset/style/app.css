@@ -1,0 +1,216 @@
+@import 'tailwindcss';
+@plugin 'daisyui';
+/* Wash styles under components so app Tailwind utilities keep cascade priority */
+@import '@menzies-mariesta-com/menzies-design-wash-ui/styles.css' layer(components);
+
+@font-face {
+	font-family: 'Fraunces';
+	src: url('../font/fraunces-latin.woff2') format('woff2');
+	font-weight: 600;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Outfit';
+	src: url('../font/outfit-latin.woff2') format('woff2');
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Outfit';
+	src: url('../font/outfit-latin-500.woff2') format('woff2');
+	font-weight: 500;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Outfit';
+	src: url('../font/outfit-latin-600.woff2') format('woff2');
+	font-weight: 600;
+	font-style: normal;
+	font-display: swap;
+}
+
+:root {
+	--font-display: 'Fraunces', Georgia, serif;
+	--font-body: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+	--loom-mint: #d8eee6;
+	--loom-mint-deep: #b8ddd0;
+	--loom-ink: #1c2a28;
+	--loom-coral: #e07a5f;
+	--loom-teal: #3d7a6f;
+	--loom-navy: #2c3e50;
+}
+
+.font-display {
+	font-family: var(--font-display);
+}
+
+.font-body {
+	font-family: var(--font-body);
+}
+
+.loom-marketing {
+	font-family: var(--font-body);
+	color: var(--loom-ink);
+}
+
+.loom-marketing h1,
+.loom-marketing h2,
+.loom-marketing h3 {
+	font-family: var(--font-display);
+	letter-spacing: -0.02em;
+}
+
+/*
+ * Soft Wash dialogs: keep modal chrome stable when footer buttons use
+ * daisyUI 5 `class:loading` on `.btn`.
+ *
+ * Root cause: `.loading` is a size utility (aspect-ratio: 1 + fixed width +
+ * mask). On a text `.btn` that becomes a square / spinner-as-the-button,
+ * the footer reflows, `.modal-box { overflow-y: auto }` sprouts a scrollbar,
+ * and width/height jump.
+ */
+
+@keyframes wash-btn-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* Keep btn box size; overlay spinner instead of applying .loading geometry */
+.btn.loading {
+	position: relative;
+	aspect-ratio: auto;
+	width: auto;
+	min-width: 5.5rem;
+	height: var(--size);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	color: transparent !important;
+	text-shadow: none;
+	-webkit-mask-image: none !important;
+	mask-image: none !important;
+	/* Override .loading { background-color: currentColor } (would vanish with transparent text) */
+	background-color: var(--btn-bg);
+	background-image: none, var(--fx-noise);
+}
+
+.btn.loading:is(:disabled, [disabled], [aria-disabled='true'], .btn-disabled):not(
+	.btn-link,
+	.btn-ghost
+) {
+	background-color: color-mix(in oklab, var(--color-base-content) 10%, transparent);
+}
+
+.btn.btn-square.loading,
+.btn.btn-circle.loading {
+	width: var(--size);
+	min-width: var(--size);
+	padding-inline: 0;
+}
+
+.btn.loading::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	margin: auto;
+	width: 1.15rem;
+	height: 1.15rem;
+	box-sizing: border-box;
+	border: 2px solid color-mix(in oklab, var(--btn-fg, var(--color-base-content)) 35%, transparent);
+	border-top-color: var(--btn-fg, var(--color-base-content));
+	border-radius: 9999px;
+	animation: wash-btn-spin 0.65s linear infinite;
+	pointer-events: none;
+}
+
+.btn.btn-xs.loading:not(.btn-square):not(.btn-circle) {
+	min-width: 4rem;
+}
+
+.btn.btn-xs.loading::after {
+	width: 0.85rem;
+	height: 0.85rem;
+	border-width: 1.5px;
+}
+
+.btn.btn-sm.loading:not(.btn-square):not(.btn-circle) {
+	min-width: 5rem;
+}
+
+.btn.btn-sm.loading::after {
+	width: 1rem;
+	height: 1rem;
+}
+
+.btn.btn-ghost.loading,
+.btn.btn-link.loading,
+.btn.btn-outline.loading,
+.btn.btn-dash.loading {
+	background-color: transparent;
+	background-image: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.btn.loading::after {
+		animation-duration: 1.6s;
+	}
+}
+
+/* Modal box: fixed max height, no chrome reflow from scrollbar or footer load */
+.modal > .modal-box {
+	display: flex;
+	flex-direction: column;
+	width: 91.6667%;
+	max-height: min(calc(100vh - 5rem), 90dvh);
+	overflow: hidden;
+}
+
+.modal > .modal-box > :where(h1, h2, h3, p, .card-title) {
+	flex-shrink: 0;
+}
+
+/* Form body scrolls; title + sticky actions stay put */
+.modal > .modal-box > form:not(.modal-action) {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-x: hidden;
+	overflow-y: auto;
+	scrollbar-gutter: stable;
+}
+
+.modal > .modal-box > form:not(.modal-action) > .modal-action {
+	flex-shrink: 0;
+	position: sticky;
+	bottom: 0;
+	z-index: 1;
+	background-color: var(--color-base-100);
+	padding-top: 0.25rem;
+}
+
+/* Confirm dialogs where the form is the action row */
+.modal > .modal-box > form.modal-action {
+	flex: 0 0 auto;
+	overflow: visible;
+}
+
+/* Optional scroll region for non-form modal content (tables, long lists) */
+.modal > .modal-box > .wash-modal-body {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-x: hidden;
+	overflow-y: auto;
+	scrollbar-gutter: stable;
+}
+
+.modal > .modal-box > .modal-action {
+	flex-shrink: 0;
+}

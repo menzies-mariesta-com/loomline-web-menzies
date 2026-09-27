@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1790422383812,
+      "tag": "0000_special_tag",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790500000000,
+      "tag": "0001_agent_station_account",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790600000000,
+      "tag": "0002_voice_messaging_channels",
+      "breakpoints": true
+    }
+  ]
+}

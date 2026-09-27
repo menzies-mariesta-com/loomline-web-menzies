@@ -1,0 +1,91 @@
+[build]
+  command = "npm run build"
+  publish = "build"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/admin/packs"
+  to = "/admin/templates"
+  status = 301
+
+[[redirects]]
+  from = "/admin/packs/*"
+  to = "/admin/templates/:splat"
+  status = 301
+
+[[redirects]]
+  from = "/admin/settings"
+  to = "/admin/config"
+  status = 301
+
+[[redirects]]
+  from = "/admin/settings/*"
+  to = "/admin/config/:splat"
+  status = 301
+
+[[headers]]
+  for = "/display/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+[[headers]]
+  for = "/kiosk/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+[[headers]]
+  for = "/t/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+[[headers]]
+  for = "/admin/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+[[headers]]
+  for = "/admin"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+[[headers]]
+  for = "/workspaces"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+[[headers]]
+  for = "/workspaces/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+[[headers]]
+  for = "/platform"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+[[headers]]
+  for = "/platform/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+[[headers]]
+  for = "/app"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+[[headers]]
+  for = "/app/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+[[headers]]
+  for = "/b/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+[[headers]]
+  for = "/auth/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"

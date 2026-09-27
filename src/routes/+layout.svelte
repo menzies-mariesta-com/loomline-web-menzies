@@ -1,0 +1,61 @@
+<script lang="ts">
+	import type { Path } from '$app/types';
+	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
+	import { onMount } from 'svelte';
+	import { locales, localizeHref } from '#lib/paraglide/runtime';
+	import {
+		initWash,
+		washRecipes
+	} from '@menzies-mariesta-com/menzies-design-wash-ui/core';
+	import '#lib/asset/style/app.css';
+
+	let { children } = $props();
+
+	/** Full-bleed Wash shell (no nested washPanel): auth, marketing, TV/kiosk, private apps. */
+	const isChromeFree = $derived.by(() => {
+		const path = page.url.pathname;
+		return (
+			path.startsWith('/auth') ||
+			path === '/' ||
+			path === '/pricing' ||
+			path.startsWith('/display') ||
+			path.startsWith('/kiosk') ||
+			path.startsWith('/t/') ||
+			path.startsWith('/demo') ||
+			path.startsWith('/admin') ||
+			path.startsWith('/workspaces') ||
+			path.startsWith('/account') ||
+			path.startsWith('/b/') ||
+			path.startsWith('/app') ||
+			path.startsWith('/platform')
+		);
+	});
+
+	onMount(() => {
+		initWash({ defaultPigment: 'mineral', defaultMode: 'light' });
+	});
+</script>
+
+{#if isChromeFree}
+	<!-- Auth, marketing, public TV/kiosk, and private shells: Wash atmosphere only. -->
+	<div class={washRecipes.washShell}>
+		{@render children()}
+	</div>
+{:else}
+	<div class={washRecipes.washShell}>
+		<main class={washRecipes.washShellMain}>
+			<article class={washRecipes.washPanel}>
+				{@render children()}
+			</article>
+		</main>
+	</div>
+{/if}
+
+<div style="display:none">
+	{#each locales as locale (locale)}
+		<a
+			href={resolve(localizeHref(page.url.pathname, { locale }) as Path)}
+		>{locale}</a>
+	{/each}
+</div>

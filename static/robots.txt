@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /
+Allow: /og-loomline.png
+Disallow: /auth/
+Disallow: /admin/
+Disallow: /workspaces/
+Disallow: /platform/
+Disallow: /b/
+Disallow: /app/
+Disallow: /api/
+Disallow: /kiosk/
+Disallow: /display/
+Disallow: /t/
+Disallow: /demo/
+
+Sitemap: /sitemap.xml
