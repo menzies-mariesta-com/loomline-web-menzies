@@ -8,6 +8,7 @@ import { account, business, invite, membership, user } from '#lib/server/db/sche
 import { requirePlatformAdmin } from '#lib/server/qms/guards';
 import { writeAudit } from '#lib/server/qms/audit';
 import {
+	inviteMailToast,
 	inviteSetPasswordUrl,
 	normalizeInviteToken,
 	sendManagerInviteEmail
@@ -90,7 +91,8 @@ export const actions: Actions = {
 		const mailResult = await sendManagerInviteEmail({
 			to: email,
 			businessName: biz.name,
-			inviteUrl
+			inviteUrl,
+			roleLabel: role.replaceAll('_', ' ')
 		});
 
 		await writeAudit({
@@ -102,13 +104,7 @@ export const actions: Actions = {
 			payload: { email, role, inviteDelivered: mailResult.ok }
 		});
 
-		const inviteNote = mailResult.ok
-			? mailResult.loggedOnly
-				? `Invite queued for ${email} (link logged on server; set SMTP_* to email it).`
-				: `Invite sent to ${email}.`
-			: `Invite created for ${email} (email failed; check SMTP_*).`;
-
-		return { success: true, message: inviteNote };
+		return inviteMailToast(email, mailResult, 'sent');
 	},
 
 	resendInvite: async ({ request, locals }) => {
@@ -139,7 +135,8 @@ export const actions: Actions = {
 		const mailResult = await sendManagerInviteEmail({
 			to: inv.email,
 			businessName: biz.name,
-			inviteUrl
+			inviteUrl,
+			roleLabel: inv.role.replaceAll('_', ' ')
 		});
 
 		await writeAudit({
@@ -151,13 +148,7 @@ export const actions: Actions = {
 			payload: { email: inv.email, inviteDelivered: mailResult.ok }
 		});
 
-		const inviteNote = mailResult.ok
-			? mailResult.loggedOnly
-				? `Invite resent for ${inv.email} (link logged on server; set SMTP_* to email it).`
-				: `Invite resent to ${inv.email}.`
-			: `Invite token refreshed for ${inv.email} (email failed; check SMTP_*).`;
-
-		return { success: true, message: inviteNote };
+		return inviteMailToast(inv.email, mailResult, 'resent');
 	},
 
 	cancelInvite: async ({ request, locals }) => {

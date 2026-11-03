@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
@@ -10,14 +11,17 @@
 		type ClientSidebarMode
 	} from '#lib/store/local-storage/client-sidebar-mode';
 	import { resolveClientPageTitle } from '#lib/tool/business-nav';
+	import { bindSubmitting } from '#lib/tool/form-submit';
 	import AppearanceMenu from './AppearanceMenu.svelte';
 	import BusinessSidebar from './BusinessSidebar.svelte';
 	import LanguageMenu from './LanguageMenu.svelte';
 	import { m } from '#lib/paraglide/messages';
+	import appIcon from '#lib/asset/image/app-icon-ticket.svg';
 	import {
 		CircleUser,
 		Globe,
 		LayoutGrid,
+		LogOut,
 		PanelLeft,
 		PanelLeftClose,
 		PanelLeftOpen,
@@ -75,6 +79,7 @@
 	let isMdUp = $state(false);
 	/** Bound to the daisyUI drawer checkbox (overlay open state). */
 	let drawerOpen = $state(false);
+	let signingOut = $state(false);
 
 	const iconOnly = $derived(isMdUp && mode === 'icon');
 	/** Hidden mode on md+ uses the same overlay drawer as small screens (not a pinned rail). */
@@ -167,7 +172,9 @@
 	<input id={DRAWER_ID} type="checkbox" class="drawer-toggle" bind:checked={drawerOpen} />
 
 	<div class="drawer-content flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-x-hidden">
-		<header class="{washRecipes.navbar} sticky top-0 z-30 min-h-12 h-12 gap-2 px-3 py-0 md:px-4">
+		<header
+			class="{washRecipes.navbar} sticky top-0 z-30 box-border flex h-12 max-h-12 min-h-12 shrink-0 items-center gap-2 px-3 py-0 md:px-4"
+		>
 			<div class="flex-none">
 				<div class="tooltip tooltip-primary tooltip-right" data-tip={sidebarControlTip}>
 					<button
@@ -188,11 +195,11 @@
 
 			<div class="flex shrink-0 items-center gap-1 sm:gap-2">
 				{#if platformAdmin}
-					<div class="tooltip tooltip-secondary tooltip-bottom" data-tip={m.common_loomline_admin()}>
+					<div class="tooltip tooltip-secondary tooltip-bottom" data-tip={m.common_nextup_admin()}>
 						<a
 							href={resolve('/admin')}
 							class="btn btn-ghost btn-square btn-sm btn-secondary hidden cursor-pointer sm:inline-flex"
-							aria-label={m.common_loomline_admin()}
+							aria-label={m.common_nextup_admin()}
 						>
 							<Shield class="size-4" aria-hidden="true" />
 						</a>
@@ -214,16 +221,17 @@
 	>
 		<label for={DRAWER_ID} class="drawer-overlay cursor-pointer" aria-label={m.common_close_menu()}></label>
 		<aside
-			class="border-base-300 bg-base-100 flex min-h-full {asideWidthClass} flex-col border-e pb-4 pt-0 transition-[width] duration-200 md:sticky md:top-0 md:h-[100dvh] {iconOnly
-				? 'items-center overflow-visible px-0'
-				: 'overflow-hidden px-3'}"
+			class="border-base-300 bg-base-100 flex min-h-full {asideWidthClass} flex-col border-e px-0 pb-4 pt-0 transition-[width] duration-200 md:sticky md:top-0 md:h-[100dvh] {iconOnly
+				? 'items-center overflow-visible'
+				: 'overflow-hidden'}"
 			data-sidebar-mode={mode}
 		>
+			<!-- Same outer height as page header: h-12 + border-b on one box-border element. -->
 			<a
 				href={brandHref}
-				class="border-ink-border/80 flex h-12 min-h-12 w-full min-w-0 shrink-0 cursor-pointer items-center border-b {iconOnly
+				class="border-base-300 box-border flex h-12 max-h-12 min-h-12 w-full min-w-0 shrink-0 cursor-pointer items-center border-b {iconOnly
 					? 'justify-center px-0'
-					: '-mx-3 gap-2 px-5'}"
+					: 'gap-2 px-5'}"
 				onclick={closeDrawer}
 			>
 				{#if business?.imageUrl}
@@ -234,23 +242,32 @@
 						width="28"
 						height="28"
 					/>
-				{:else}
+				{:else if business}
 					<span
 						class="bg-secondary/20 text-secondary flex size-7 shrink-0 items-center justify-center rounded-lg text-xs font-semibold"
 						aria-hidden="true"
 					>
-						{business ? brandInitial : 'L'}
+						{brandInitial}
 					</span>
+				{:else}
+					<img
+						src={appIcon}
+						alt=""
+						width="28"
+						height="28"
+						class="size-7 shrink-0"
+						aria-hidden="true"
+					/>
 				{/if}
 				{#if showLabels}
 					<span class="flex min-w-0 flex-col leading-tight">
 						<span class="truncate text-sm font-semibold">{brandLabel}</span>
 						{#if business}
-							<span class="truncate text-[10px] font-normal italic opacity-50">
+							<span class="text-ink-muted truncate text-[10px] font-normal italic">
 								{templateName || m.common_no_template()}
 							</span>
 						{:else}
-							<span class="truncate text-[10px] font-normal italic opacity-50">
+							<span class="text-ink-muted truncate text-[10px] font-normal italic">
 								{m.common_tenant_workspaces()}
 							</span>
 						{/if}
@@ -264,7 +281,7 @@
 			<div
 				class="flex min-h-0 w-full flex-1 flex-col {iconOnly
 					? 'items-center overflow-visible'
-					: 'overflow-y-auto'}"
+					: 'overflow-y-auto px-3'}"
 			>
 				{#if !business || platformAdmin}
 					{#if iconOnly}
@@ -290,8 +307,8 @@
 									<a
 										href={resolve('/admin')}
 										class="btn btn-ghost btn-square btn-sm btn-secondary tooltip tooltip-right tooltip-secondary cursor-pointer"
-										data-tip={m.common_loomline_admin()}
-										aria-label={m.common_loomline_admin()}
+										data-tip={m.common_nextup_admin()}
+										aria-label={m.common_nextup_admin()}
 										onclick={closeDrawer}
 									>
 										<Shield class="size-4 shrink-0" aria-hidden="true" />
@@ -324,7 +341,7 @@
 										onclick={closeDrawer}
 									>
 										<Shield class="size-4" aria-hidden="true" />
-										{m.common_loomline_admin()}
+										{m.common_nextup_admin()}
 									</a>
 								</li>
 							{/if}
@@ -345,14 +362,11 @@
 			</div>
 
 			<div class="mt-auto w-full shrink-0">
-				<div
-					class="border-base-300 border-t {iconOnly ? '' : '-mx-3'}"
-					aria-hidden="true"
-				></div>
+				<div class="border-base-300 border-t" aria-hidden="true"></div>
 				<div
 					class="flex flex-col gap-0.5 {iconOnly
 						? 'items-center py-2'
-						: 'overflow-visible py-2'}"
+						: 'overflow-visible px-3 py-2'}"
 				>
 					{#if burgerMode}
 						<button
@@ -365,6 +379,15 @@
 							Full sidebar
 						</button>
 					{/if}
+
+					<form
+						id="client-shell-logout"
+						method="POST"
+						action={resolve('/auth/logout')}
+						class="hidden"
+						aria-hidden="true"
+						use:enhance={bindSubmitting((v) => (signingOut = v))}
+					></form>
 
 					{#if iconOnly}
 						<a
@@ -386,6 +409,21 @@
 						>
 							<Globe class="size-4 shrink-0" aria-hidden="true" />
 						</a>
+						<button
+							type="submit"
+							form="client-shell-logout"
+							class="btn btn-ghost btn-square btn-sm btn-error tooltip tooltip-right tooltip-error"
+							class:cursor-pointer={!signingOut}
+							class:cursor-not-allowed={signingOut}
+							class:btn-disabled={signingOut}
+							class:loading={signingOut}
+							data-tip={m.common_sign_out()}
+							aria-label={m.common_sign_out()}
+							disabled={signingOut}
+							aria-busy={signingOut}
+						>
+							<LogOut class="size-4 shrink-0" aria-hidden="true" />
+						</button>
 					{:else}
 						<ul class="menu menu-sm w-full gap-0.5 overflow-visible p-0">
 							<li class="overflow-visible">
@@ -410,6 +448,22 @@
 									<Globe class="size-4 shrink-0" aria-hidden="true" />
 									{m.common_website()}
 								</a>
+							</li>
+							<li class="overflow-visible">
+								<button
+									type="submit"
+									form="client-shell-logout"
+									class="btn btn-ghost btn-error btn-sm h-auto min-h-0 justify-start gap-2 px-3 font-normal"
+									class:cursor-pointer={!signingOut}
+									class:cursor-not-allowed={signingOut}
+									class:btn-disabled={signingOut}
+									class:loading={signingOut}
+									disabled={signingOut}
+									aria-busy={signingOut}
+								>
+									<LogOut class="size-4 shrink-0" aria-hidden="true" />
+									{m.common_sign_out()}
+								</button>
 							</li>
 						</ul>
 					{/if}

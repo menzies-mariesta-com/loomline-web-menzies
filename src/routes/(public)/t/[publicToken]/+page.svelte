@@ -6,9 +6,9 @@
 </script>
 
 <svelte:head>
-	<title>Ticket {data.ticket.number} | Loomline</title>
+	<title>Ticket {data.ticket.number} | NextUp</title>
 	<meta name="robots" content="noindex,nofollow" />
-	<meta name="description" content="Track your Loomline queue ticket status." />
+	<meta name="description" content="Track your NextUp queue ticket status." />
 </svelte:head>
 
 <div class="mx-auto max-w-lg py-6 text-center">

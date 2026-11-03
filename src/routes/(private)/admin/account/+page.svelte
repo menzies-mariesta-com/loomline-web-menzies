@@ -5,7 +5,7 @@
 </script>
 
 <svelte:head>
-	<title>Account | Loomline</title>
+	<title>Account | NextUp</title>
 	<meta name="robots" content="noindex,nofollow" />
 </svelte:head>
 

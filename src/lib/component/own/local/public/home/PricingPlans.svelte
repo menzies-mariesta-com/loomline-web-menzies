@@ -4,13 +4,16 @@
 	import { m } from '#lib/paraglide/messages';
 	import {
 		ANNUAL_OFF,
+		CLOUD_MONTHLY_USD,
+		ONPREM_PREMIUM_USD,
 		USD_TO_MMK,
+		effectiveMonthlyUsd,
 		formatMmk,
 		formatUsd,
-		monthlyListUsd,
 		usdToMmk,
 		type BillingPeriod,
-		type PricingMarket
+		type PricingMarket,
+		type ServiceMode
 	} from '#lib/tool/pricing';
 
 	type PlanId = 'starter' | 'business' | 'scale' | 'platform';
@@ -19,40 +22,51 @@
 		id: PlanId;
 		name: string;
 		tagline: string;
-		monthlyUsd: number | null;
+		/** Cloud monthly USD list. Null = custom quote (Platform). */
+		cloudMonthlyUsd: number | null;
 		highlight?: boolean;
 		ctaLabel: string;
 		ctaHref: string;
 		features: string[];
 	};
 
+	let mode = $state<ServiceMode>('cloud');
+	let period = $state<BillingPeriod>('monthly');
+	let market = $state<PricingMarket>('global');
+
+	const cloud = $derived(mode === 'cloud');
+	const annual = $derived(period === 'annual');
+	const myanmar = $derived(market === 'myanmar');
+	const savePercent = String(ANNUAL_OFF * 100);
+	const premiumUsd = formatUsd(ONPREM_PREMIUM_USD);
+
 	const plans = $derived<Plan[]>([
 		{
 			id: 'starter',
 			name: m.pricing_plan_starter_name(),
-			tagline: m.pricing_plan_starter_tagline(),
-			monthlyUsd: 49,
+			tagline: cloud ? m.pricing_plan_starter_tagline() : m.pricing_plan_starter_tagline_onprem(),
+			cloudMonthlyUsd: CLOUD_MONTHLY_USD.starter,
 			ctaLabel: m.pricing_plan_starter_cta(),
 			ctaHref: resolve('/auth/login'),
 			features: [
-				m.pricing_plan_starter_f1(),
+				cloud ? m.pricing_plan_starter_f1() : m.pricing_plan_starter_f1_onprem(),
 				m.pricing_plan_starter_f2(),
 				m.pricing_plan_starter_f3(),
 				m.pricing_plan_starter_f4(),
 				m.pricing_plan_starter_f5(),
-				m.pricing_plan_starter_f6()
+				cloud ? m.pricing_plan_starter_f6() : m.pricing_plan_starter_f6_onprem()
 			]
 		},
 		{
 			id: 'business',
 			name: m.pricing_plan_business_name(),
-			tagline: m.pricing_plan_business_tagline(),
-			monthlyUsd: 149,
+			tagline: cloud ? m.pricing_plan_business_tagline() : m.pricing_plan_business_tagline_onprem(),
+			cloudMonthlyUsd: CLOUD_MONTHLY_USD.business,
 			highlight: true,
 			ctaLabel: m.pricing_plan_business_cta(),
 			ctaHref: resolve('/auth/login'),
 			features: [
-				m.pricing_plan_business_f1(),
+				cloud ? m.pricing_plan_business_f1() : m.pricing_plan_business_f1_onprem(),
 				m.pricing_plan_business_f2(),
 				m.pricing_plan_business_f3(),
 				m.pricing_plan_business_f4(),
@@ -64,8 +78,8 @@
 		{
 			id: 'scale',
 			name: m.pricing_plan_scale_name(),
-			tagline: m.pricing_plan_scale_tagline(),
-			monthlyUsd: 299,
+			tagline: cloud ? m.pricing_plan_scale_tagline() : m.pricing_plan_scale_tagline_onprem(),
+			cloudMonthlyUsd: CLOUD_MONTHLY_USD.scale,
 			ctaLabel: m.pricing_plan_scale_cta(),
 			ctaHref: resolve('/auth/login'),
 			features: [
@@ -81,8 +95,8 @@
 		{
 			id: 'platform',
 			name: m.pricing_plan_platform_name(),
-			tagline: m.pricing_plan_platform_tagline(),
-			monthlyUsd: null,
+			tagline: cloud ? m.pricing_plan_platform_tagline() : m.pricing_plan_platform_tagline_onprem(),
+			cloudMonthlyUsd: null,
 			ctaLabel: m.pricing_plan_platform_cta(),
 			ctaHref: resolve('/auth/login'),
 			features: [
@@ -91,20 +105,15 @@
 				m.pricing_plan_platform_f3(),
 				m.pricing_plan_platform_f4(),
 				m.pricing_plan_platform_f5(),
-				m.pricing_plan_platform_f6()
+				cloud ? m.pricing_plan_platform_f6() : m.pricing_plan_platform_f6_onprem()
 			]
 		}
 	]);
 
-	let period = $state<BillingPeriod>('monthly');
-	let market = $state<PricingMarket>('global');
+	const plansLabel = $derived(cloud ? m.pricing_cloud_plans_label() : m.pricing_onprem_plans_label());
 
-	const annual = $derived(period === 'annual');
-	const myanmar = $derived(market === 'myanmar');
-	const savePercent = String(ANNUAL_OFF * 100);
-
-	function listUsd(monthlyUsd: number): number {
-		return monthlyListUsd(monthlyUsd, period);
+	function listUsd(cloudMonthly: number): number {
+		return effectiveMonthlyUsd(cloudMonthly, mode, period);
 	}
 </script>
 
@@ -121,18 +130,25 @@
 		>
 			{m.pricing_heading()}
 		</h1>
-		<p class="mt-3 max-w-xl text-base leading-relaxed text-[var(--loom-ink)]/75 sm:text-lg">
+		<p class="mt-3 max-w-2xl text-base leading-relaxed text-[var(--loom-ink)]/75 sm:text-lg">
 			{m.pricing_lead()}
-			{#if myanmar}
-				{m.pricing_lead_mmk({ rate: formatMmk(USD_TO_MMK) })}
+		</p>
+		<p class="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--loom-ink)]/70 sm:text-base">
+			{#if cloud}
+				{m.pricing_lead_cloud()}
 			{:else}
-				{m.pricing_lead_usd()}
+				{m.pricing_lead_onprem({ premium: premiumUsd })}
+			{/if}
+			{#if myanmar}
+				{' '}{m.pricing_lead_mmk({ rate: formatMmk(USD_TO_MMK) })}
+			{:else}
+				{' '}{m.pricing_lead_usd()}
 			{/if}
 		</p>
 
-		<div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+		<div class="mt-8 flex flex-wrap items-center justify-between gap-3">
 			<div
-				class="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--loom-ink)]/10 bg-white/40 p-1.5"
+				class="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--loom-ink)]/10 bg-base-100/40 p-1.5"
 				role="group"
 				aria-label={m.pricing_billing_period()}
 			>
@@ -160,8 +176,36 @@
 					>
 				</button>
 			</div>
+
 			<div
-				class="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--loom-ink)]/10 bg-white/40 p-1.5"
+				class="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--loom-ink)]/10 bg-base-100/40 p-1.5"
+				role="group"
+				aria-label={m.pricing_service_mode()}
+			>
+				<button
+					type="button"
+					class="btn btn-sm cursor-pointer rounded-full {cloud
+						? 'btn-primary'
+						: 'btn-ghost text-[var(--loom-ink)]/70'}"
+					aria-pressed={cloud}
+					onclick={() => (mode = 'cloud')}
+				>
+					{m.pricing_mode_cloud()}
+				</button>
+				<button
+					type="button"
+					class="btn btn-sm cursor-pointer rounded-full {!cloud
+						? 'btn-primary'
+						: 'btn-ghost text-[var(--loom-ink)]/70'}"
+					aria-pressed={!cloud}
+					onclick={() => (mode = 'onprem')}
+				>
+					{m.pricing_mode_onprem()}
+				</button>
+			</div>
+
+			<div
+				class="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--loom-ink)]/10 bg-base-100/40 p-1.5"
 				role="group"
 				aria-label={m.pricing_market_currency()}
 			>
@@ -187,16 +231,10 @@
 				</button>
 			</div>
 		</div>
-
-		{#if annual}
-			<p class="mt-3 text-sm text-[var(--loom-teal)]">
-				{m.pricing_annual_note({ percent: savePercent })}
-			</p>
-		{/if}
 	</div>
 </section>
 
-<section class="px-4 pb-16 sm:px-6 sm:pb-24" aria-label={m.pricing_plans_label()}>
+<section class="px-4 pb-16 sm:px-6 sm:pb-24" aria-label={plansLabel}>
 	<div class="mx-auto max-w-6xl">
 		<div
 			class="flex flex-col divide-y divide-[var(--loom-ink)]/10 border-y border-[var(--loom-ink)]/10 lg:grid lg:grid-cols-4 lg:divide-x lg:divide-y-0"
@@ -226,8 +264,8 @@
 					<p class="mt-1 text-sm leading-snug text-[var(--loom-ink)]/65">{plan.tagline}</p>
 
 					<div class="mt-5 min-h-[5.5rem]">
-						{#if plan.monthlyUsd != null}
-							{@const usdMo = listUsd(plan.monthlyUsd)}
+						{#if plan.cloudMonthlyUsd != null}
+							{@const usdMo = listUsd(plan.cloudMonthlyUsd)}
 							{@const mmkMo = usdToMmk(usdMo)}
 							{@const usdYr = usdMo * 12}
 							{@const mmkYr = usdToMmk(usdYr)}

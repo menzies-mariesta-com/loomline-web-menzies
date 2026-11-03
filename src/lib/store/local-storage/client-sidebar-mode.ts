@@ -1,11 +1,11 @@
 /**
  * Business / client shell sidebar layout preference.
- * Persisted as `full` | `icon` | `hidden` under `loomline-client-sidebar-mode`.
+ * Persisted as `full` | `icon` | `hidden` under `nextup-client-sidebar-mode`.
  */
 
 export type ClientSidebarMode = 'full' | 'icon' | 'hidden';
 
-export const CLIENT_SIDEBAR_MODE_KEY = 'loomline-client-sidebar-mode';
+export const CLIENT_SIDEBAR_MODE_KEY = 'nextup-client-sidebar-mode';
 
 export const CLIENT_SIDEBAR_MODE_LABELS: Record<ClientSidebarMode, string> = {
 	full: 'Full sidebar',

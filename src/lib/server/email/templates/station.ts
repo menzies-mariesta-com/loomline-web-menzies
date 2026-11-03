@@ -16,7 +16,7 @@ export function stationAccountCreatedEmail(props: StationAccountCreatedProps): E
 	const loginUrl = (props.loginUrl ?? `${siteOrigin()}/auth/login`).trim();
 	const subject = `Station account for ${props.businessName}`;
 	const text = [
-		`A Loomline agent station account was created for ${props.businessName}.`,
+		`A NextUp agent station account was created for ${props.businessName}.`,
 		props.deviceName ? `Device: ${props.deviceName}` : '',
 		'',
 		`Sign-in email: ${props.stationEmail}`,
@@ -34,8 +34,8 @@ export function stationAccountCreatedEmail(props: StationAccountCreatedProps): E
 		heading: 'Station account ready',
 		preheader: `Credentials for ${props.businessName}`,
 		showHero: false,
-		cta: { label: 'Sign in to Loomline', url: loginUrl },
-		bodyHtml: `<p style="margin:0 0 12px;">A Loomline agent station account was created for <strong>${escapeHtml(props.businessName)}</strong>.</p>
+		cta: { label: 'Sign in to NextUp', url: loginUrl },
+		bodyHtml: `<p style="margin:0 0 12px;">A NextUp agent station account was created for <strong>${escapeHtml(props.businessName)}</strong>.</p>
 ${props.deviceName ? `<p style="margin:0 0 12px;">Device: <strong>${escapeHtml(props.deviceName)}</strong></p>` : ''}
 <p style="margin:0 0 8px;"><strong>Email:</strong> ${escapeHtml(props.stationEmail)}</p>
 ${props.temporaryPassword ? `<p style="margin:0 0 12px;"><strong>Temporary password:</strong> ${escapeHtml(props.temporaryPassword)}</p>` : ''}

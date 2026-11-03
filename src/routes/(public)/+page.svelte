@@ -16,28 +16,28 @@
 	const title = $derived(m.home_seo_title());
 	const description = $derived(m.home_seo_description());
 	const canonical = $derived(data.origin.replace(/\/$/, ''));
-	const ogImage = $derived(`${canonical}/og-loomline.png`);
+	const ogImage = $derived(`${canonical}/og-nextup.png`);
 
 	const jsonLd = $derived(
 		JSON.stringify([
 			{
 				'@context': 'https://schema.org',
 				'@type': 'Organization',
-				name: m.brand_loomline(),
+				name: m.brand_nextup(),
 				url: canonical,
 				description
 			},
 			{
 				'@context': 'https://schema.org',
 				'@type': 'WebSite',
-				name: m.brand_loomline(),
+				name: m.brand_nextup(),
 				url: canonical,
 				description
 			},
 			{
 				'@context': 'https://schema.org',
 				'@type': 'SoftwareApplication',
-				name: m.brand_loomline_qms(),
+				name: m.brand_nextup_qms(),
 				applicationCategory: 'BusinessApplication',
 				operatingSystem: 'Web',
 				url: canonical,
@@ -55,7 +55,7 @@
 	<meta property="og:description" content={description} />
 	<meta property="og:url" content="{canonical}/" />
 	<meta property="og:type" content="website" />
-	<meta property="og:site_name" content={m.brand_loomline()} />
+	<meta property="og:site_name" content={m.brand_nextup()} />
 	<meta property="og:image" content={ogImage} />
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:title" content={title} />

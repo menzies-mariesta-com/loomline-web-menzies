@@ -37,6 +37,10 @@
 		{
 			q: m.pricing_faq_q4(),
 			a: m.pricing_faq_a4()
+		},
+		{
+			q: m.pricing_faq_q5(),
+			a: m.pricing_faq_a5()
 		}
 	]);
 </script>

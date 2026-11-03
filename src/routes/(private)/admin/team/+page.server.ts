@@ -38,7 +38,7 @@ export const actions: Actions = {
 			.trim()
 			.toLowerCase();
 		const name = String(form.get('name') ?? '').trim();
-		const password = String(form.get('password') ?? '').trim() || 'LoomlineAdmin1!';
+		const password = String(form.get('password') ?? '').trim() || 'NextUpAdmin1!';
 
 		if (!email) return fail(400, { message: 'Email is required.', success: false });
 

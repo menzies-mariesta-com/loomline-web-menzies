@@ -1,5 +1,5 @@
+import type { Component } from 'svelte';
 import {
-	LayoutDashboard,
 	MapPin,
 	Briefcase,
 	Monitor,
@@ -13,18 +13,90 @@ import {
 	UserRound,
 	Building2,
 	ArrowRightLeft,
-	GitBranch
+	GitBranch,
+	Logs,
+	Settings
 } from '@lucide/svelte';
 import { m } from '#lib/paraglide/messages';
 
 export type BusinessNavLink = {
 	href: string;
 	label: string;
-	icon: typeof LayoutDashboard;
+	icon: Component;
 	exact?: boolean;
 };
 
-export function getBusinessNavLinks(businessId: string, role: string): BusinessNavLink[] {
+export type BusinessNavPage = {
+	href: string;
+	label: string;
+	exact?: boolean;
+};
+
+export type BusinessNavPageGroup = {
+	label: string;
+	pages: BusinessNavPage[];
+};
+
+export type BusinessNavModule = {
+	id: string;
+	label: string;
+	icon: Component;
+	groups: BusinessNavPageGroup[];
+};
+
+export type BusinessModuleBarModel = {
+	/** Hover dropdown modules (e.g. Administration). */
+	modules: BusinessNavModule[];
+	/** Top-level module bar tabs. */
+	links: BusinessNavLink[];
+};
+
+function operationalLinks(base: string): BusinessNavLink[] {
+	return [
+		{ href: `${base}/agent`, label: m.nav_agent(), icon: Headset },
+		{ href: `${base}/tickets`, label: m.nav_tickets(), icon: Ticket },
+		{ href: `${base}/appointments`, label: m.nav_appointments(), icon: CalendarDays }
+	];
+}
+
+function administrationModule(base: string): BusinessNavModule {
+	return {
+		id: 'administration',
+		label: m.nav_administration(),
+		icon: Settings,
+		groups: [
+			{
+				label: m.nav_group_floor_setup(),
+				pages: [
+					{ href: `${base}/sites`, label: m.nav_sites() },
+					{ href: `${base}/services`, label: m.nav_services() },
+					{ href: `${base}/queues`, label: m.nav_queues() },
+					{ href: `${base}/counters`, label: m.nav_counters() },
+					{ href: `${base}/devices`, label: m.nav_devices() }
+				]
+			},
+			{
+				label: m.nav_group_routing(),
+				pages: [
+					{ href: `${base}/departments`, label: m.nav_departments() },
+					{ href: `${base}/destinations`, label: m.nav_destinations() },
+					{ href: `${base}/timelines`, label: m.nav_timelines() }
+				]
+			},
+			{
+				label: m.nav_group_business(),
+				pages: [
+					{ href: `${base}/team`, label: m.nav_team() },
+					{ href: `${base}/config`, label: m.nav_config() },
+					{ href: `${base}/logs`, label: m.nav_logs() }
+				]
+			}
+		]
+	};
+}
+
+/** Module bar: Administration dropdown first, then floor operations. Overview is the home icon only. */
+export function getBusinessModuleBar(businessId: string, role: string): BusinessModuleBarModel {
 	const base = `/b/${businessId}`;
 	const isStaff = ['platform_admin', 'business_owner', 'manager', 'counter_agent'].includes(role);
 	const isGuest = role === 'guest';
@@ -32,49 +104,72 @@ export function getBusinessNavLinks(businessId: string, role: string): BusinessN
 	const isCounterAgent = role === 'counter_agent';
 
 	if (isGuest) {
-		return [
-			{ href: base, label: m.common_home(), icon: LayoutDashboard, exact: true },
-			{ href: `${base}/guest`, label: m.nav_guest(), icon: UserRound }
-		];
+		return {
+			modules: [],
+			links: [{ href: `${base}/guest`, label: m.nav_guest(), icon: UserRound }]
+		};
 	}
-	if (!isStaff) return [];
+	if (!isStaff) return { modules: [], links: [] };
 
-	/** Station accounts: ticket calling only. */
 	if (isCounterAgent) {
-		return [
-			{ href: base, label: m.common_home(), icon: LayoutDashboard, exact: true },
-			{ href: `${base}/agent`, label: m.nav_agent(), icon: Headset }
-		];
+		return {
+			modules: [],
+			links: [{ href: `${base}/agent`, label: m.nav_agent(), icon: Headset }]
+		};
 	}
 
-	const staff: BusinessNavLink[] = [
-		{ href: base, label: m.common_home(), icon: LayoutDashboard, exact: true },
-		{ href: `${base}/agent`, label: m.nav_agent(), icon: Headset },
-		{ href: `${base}/departments`, label: m.nav_departments(), icon: Building2 },
-		{ href: `${base}/destinations`, label: m.nav_destinations(), icon: ArrowRightLeft },
-		{ href: `${base}/timelines`, label: m.nav_timelines(), icon: GitBranch },
-		{ href: `${base}/counters`, label: m.nav_counters(), icon: Monitor },
-		{ href: `${base}/services`, label: m.nav_services(), icon: Briefcase },
-		{ href: `${base}/queues`, label: m.nav_queues(), icon: ListOrdered },
-		{ href: `${base}/sites`, label: m.nav_sites(), icon: MapPin },
-		{ href: `${base}/tickets`, label: m.nav_tickets(), icon: Ticket },
-		{ href: `${base}/appointments`, label: m.nav_appointments(), icon: CalendarDays },
-		{ href: `${base}/devices`, label: m.nav_devices(), icon: Tablet }
-	];
+	const modules = canManage ? [administrationModule(base)] : [];
+	return { modules, links: operationalLinks(base) };
+}
 
-	if (canManage) {
-		staff.push(
-			{ href: `${base}/team`, label: m.nav_team(), icon: Users },
-			{ href: `${base}/config`, label: m.nav_config(), icon: Settings2 }
-		);
+/** Flat list for sidebars and title resolution (no duplicate Overview tab). */
+export function getBusinessNavLinks(businessId: string, role: string): BusinessNavLink[] {
+	const { modules, links } = getBusinessModuleBar(businessId, role);
+	const flat: BusinessNavLink[] = [...links];
+	for (const mod of modules) {
+		for (const group of mod.groups) {
+			for (const page of group.pages) {
+				flat.push({
+					href: page.href,
+					label: page.label,
+					icon: mod.icon
+				});
+			}
+		}
 	}
+	return flat;
+}
 
-	return staff;
+export function getBusinessSidebarGroups(
+	businessId: string,
+	role: string
+): { links: BusinessNavLink[]; adminGroups: BusinessNavPageGroup[] } {
+	const { modules, links } = getBusinessModuleBar(businessId, role);
+	const adminGroups = modules.find((x) => x.id === 'administration')?.groups ?? [];
+	return { links, adminGroups };
 }
 
 export function isBusinessNavActive(pathname: string, href: string, exact?: boolean): boolean {
 	if (exact) return pathname === href;
 	return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+export function activeAdministrationPage(
+	pathname: string,
+	businessId: string,
+	role: string
+): BusinessNavPage | null {
+	const { modules } = getBusinessModuleBar(businessId, role);
+	const mod = modules.find((x) => x.id === 'administration');
+	if (!mod) return null;
+	let best: BusinessNavPage | null = null;
+	for (const group of mod.groups) {
+		for (const page of group.pages) {
+			if (!isBusinessNavActive(pathname, page.href, page.exact)) continue;
+			if (!best || page.href.length > best.href.length) best = page;
+		}
+	}
+	return best;
 }
 
 function titleCaseSegment(segment: string): string {
@@ -83,7 +178,7 @@ function titleCaseSegment(segment: string): string {
 		.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-/** Top-bar page title from route + sidebar nav labels (never the business name). */
+/** Top-bar page title from route + nav labels (never the business name). */
 export function resolveClientPageTitle(
 	pathname: string,
 	opts: { businessId?: string; role?: string; dataTitle?: string } = {}
@@ -103,17 +198,24 @@ export function resolveClientPageTitle(
 	}
 
 	if (opts.businessId) {
+		const adminPage = activeAdministrationPage(pathname, opts.businessId, opts.role ?? '');
+		if (adminPage) return adminPage.label;
+
 		const links = getBusinessNavLinks(opts.businessId, opts.role ?? '');
 		const match = links
 			.filter((link) => isBusinessNavActive(pathname, link.href, link.exact))
 			.sort((a, b) => b.href.length - a.href.length)[0];
 		if (match) return match.label;
+
+		if (pathname === `/b/${opts.businessId}` || pathname === `/b/${opts.businessId}/`) {
+			return m.nav_overview();
+		}
 	}
 
 	if (opts.dataTitle?.trim()) return opts.dataTitle.trim();
 
 	const segments = pathname.split('/').filter(Boolean);
 	const last = segments.at(-1);
-	if (!last || last === opts.businessId) return m.common_home();
+	if (!last || last === opts.businessId) return m.nav_overview();
 	return titleCaseSegment(last);
 }

@@ -18,8 +18,20 @@ export const membershipStatusEnum = pgEnum('membership_status', [
 export const businessStatusEnum = pgEnum('business_status', [
 	'active',
 	'suspended',
-	'pending'
+	'pending',
+	'inactive',
+	'trial_expired'
 ]);
+
+/** Public pricing trial request lifecycle. */
+export const trialRequestStatusEnum = pgEnum('trial_request_status', [
+	'pending',
+	'approved',
+	'rejected'
+]);
+
+/** Trial length selected on pricing / admin invite. */
+export const trialDurationEnum = pgEnum('trial_duration', ['7d', '2w', '1m']);
 
 export const counterStatusEnum = pgEnum('counter_status', [
 	'open',

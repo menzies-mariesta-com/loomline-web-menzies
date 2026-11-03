@@ -19,6 +19,9 @@
 	import DataTableShell from '#lib/component/own/local/private/data-table/DataTableShell.svelte';
 	import DateRangeFilter from '#lib/component/own/local/private/data-table/DateRangeFilter.svelte';
 	import SearchSelect from '#lib/component/own/local/private/SearchSelect.svelte';
+	import ToastDismissButton from '#lib/component/own/local/private/ToastDismissButton.svelte';
+	import IconActionTip from '#lib/component/wash/tooltip/IconActionTip.svelte';
+	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
 
 	let { data, form } = $props();
 
@@ -192,7 +195,7 @@
 </script>
 
 <svelte:head>
-	<title>Invites | Loomline Admin</title>
+	<title>Invites | NextUp Admin</title>
 	<meta name="robots" content="noindex,nofollow" />
 </svelte:head>
 
@@ -210,19 +213,15 @@
 					<CircleX class="h-5 w-5 shrink-0" aria-hidden="true" />
 				{/if}
 				<span>{form.message}</span>
-				<button
-					type="button"
-					class="btn btn-ghost btn-xs cursor-pointer"
-					onclick={() => (toastGone = true)}>Dismiss</button
-				>
+				<ToastDismissButton onclick={() => (toastGone = true)} />
 			</div>
 		</div>
 	{/if}
 
 	<DataTableShell title="Invites" bind:bodyEl footerSummary={footerSummary}>
 		{#snippet headerActions()}
-			<div class="tooltip tooltip-bottom tooltip-secondary" data-tip="Refresh">
-				<button
+			<WashTooltip tooltipText="Refresh" className="tooltip-secondary">
+<button
 					type="button"
 					class="btn btn-ghost btn-square btn-sm btn-secondary"
 					class:cursor-pointer={!refreshing}
@@ -238,9 +237,9 @@
 						<RefreshCw class="size-4" aria-hidden="true" />
 					{/if}
 				</button>
-			</div>
-			<div class="tooltip tooltip-left tooltip-primary" data-tip="Add">
-				<button
+</WashTooltip>
+			<WashTooltip tooltipText="Add" className="tooltip-primary">
+<button
 					type="button"
 					class="btn btn-ghost btn-square btn-sm btn-primary cursor-pointer"
 					aria-label="Add"
@@ -248,7 +247,7 @@
 				>
 					<Plus class="size-4" aria-hidden="true" />
 				</button>
-			</div>
+</WashTooltip>
 		{/snippet}
 
 		<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
@@ -352,8 +351,8 @@
 											)}
 										>
 											<input type="hidden" name="inviteId" value={inv.id} />
-											<div class="tooltip tooltip-secondary tooltip-right" data-tip="Resend">
-												<button
+											<IconActionTip tip="Resend" tone="secondary">
+<button
 													type="submit"
 													class="btn btn-ghost btn-square btn-xs btn-secondary"
 													class:cursor-pointer={busyId !== inv.id}
@@ -367,10 +366,11 @@
 														<Mail class="size-3.5" aria-hidden="true" />
 													{/if}
 												</button>
-											</div>
+											</IconActionTip>
+
 										</form>
-										<div class="tooltip tooltip-secondary tooltip-right" data-tip="Provision">
-											<button
+										<IconActionTip tip="Provision" tone="secondary">
+<button
 												type="button"
 												class="btn btn-ghost btn-square btn-xs btn-secondary cursor-pointer"
 												aria-label="Provision"
@@ -378,7 +378,8 @@
 											>
 												<UserPlus class="size-3.5" aria-hidden="true" />
 											</button>
-										</div>
+										</IconActionTip>
+
 										<form
 											method="POST"
 											action="?/cancelInvite"
@@ -390,8 +391,8 @@
 											)}
 										>
 											<input type="hidden" name="inviteId" value={inv.id} />
-											<div class="tooltip tooltip-warning tooltip-right" data-tip="Cancel">
-												<button
+											<IconActionTip tip="Cancel" tone="warning">
+<button
 													type="submit"
 													class="btn btn-ghost btn-square btn-xs btn-warning"
 													class:cursor-pointer={busyId !== inv.id}
@@ -405,11 +406,12 @@
 														<Ban class="size-3.5" aria-hidden="true" />
 													{/if}
 												</button>
-											</div>
+											</IconActionTip>
+
 										</form>
 									{/if}
-									<div class="tooltip tooltip-error tooltip-right" data-tip="Delete">
-										<button
+									<IconActionTip tip="Delete" tone="error">
+<button
 											type="button"
 											class="btn btn-ghost btn-square btn-xs btn-error cursor-pointer"
 											aria-label="Delete"
@@ -417,7 +419,8 @@
 										>
 											<Trash2 class="size-3.5" aria-hidden="true" />
 										</button>
-									</div>
+									</IconActionTip>
+
 								</div>
 							</td>
 							<td>{(safePage - 1) * pageSize + i + 1}</td>

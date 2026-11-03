@@ -30,9 +30,9 @@
 			{m.home_industries_lead()}
 		</p>
 		<ul class="mt-12 grid gap-6 md:grid-cols-3">
-			{#each industries as item}
+			{#each industries as item (item.title)}
 				<li
-					class="rounded-2xl border border-[var(--loom-ink)]/10 bg-white/50 p-6 backdrop-blur-sm"
+					class="rounded-2xl border border-[var(--loom-ink)]/10 bg-base-100/50 p-6 backdrop-blur-sm"
 				>
 					<h3 class="text-lg font-semibold text-[var(--loom-ink)]">{item.title}</h3>
 					<p class="mt-2 text-sm leading-relaxed text-[var(--loom-ink)]/70">{item.body}</p>

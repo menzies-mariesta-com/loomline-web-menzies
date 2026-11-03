@@ -15,9 +15,9 @@ export function managerInviteEmail(props: ManagerInviteProps): EmailMessage {
 	const days = props.expiresInDays ?? 7;
 	const role = props.roleLabel?.trim();
 	const joinAs = role ? ` as ${role}` : '';
-	const subject = `Set your password for ${props.businessName} on Loomline`;
+	const subject = `Set your password for ${props.businessName} on NextUp`;
 	const text = [
-		`You have been invited to manage ${props.businessName} on Loomline${joinAs}.`,
+		`You have been invited to manage ${props.businessName} on NextUp${joinAs}.`,
 		'',
 		'Open this link to set your password and activate your account:',
 		props.inviteUrl.trim(),
@@ -27,11 +27,11 @@ export function managerInviteEmail(props: ManagerInviteProps): EmailMessage {
 	].join('\n');
 
 	const html = renderEmailLayout({
-		heading: 'You are invited to Loomline',
+		heading: 'You are invited to NextUp',
 		preheader: `Join ${props.businessName} and set your password`,
 		showHero: true,
 		cta: { label: 'Set your password', url: props.inviteUrl.trim() },
-		bodyHtml: `<p style="margin:0 0 12px;">You have been invited to manage <strong>${escapeHtml(props.businessName)}</strong> on Loomline${role ? ` as <strong>${escapeHtml(role)}</strong>` : ''}.</p>
+		bodyHtml: `<p style="margin:0 0 12px;">You have been invited to manage <strong>${escapeHtml(props.businessName)}</strong> on NextUp${role ? ` as <strong>${escapeHtml(role)}</strong>` : ''}.</p>
 <p style="margin:0 0 12px;">Use the button below to set your password and activate your account.</p>
 <p style="margin:0;font-size:13px;opacity:0.85;">This invite expires in ${days} days. If you did not expect this email, you can ignore it.</p>`
 	});
@@ -46,13 +46,13 @@ export type TeamInviteProps = {
 	expiresInDays?: number;
 };
 
-/** Business team invite (owner/manager inviting staff). */
+/** Business team invite (owner/manager inviting staff). Set-password link (same UX as reset-password invite). */
 export function teamInviteEmail(props: TeamInviteProps): EmailMessage {
 	const days = props.expiresInDays ?? 7;
 	const role = props.roleLabel?.trim() || 'team member';
-	const subject = `Join ${props.businessName} on Loomline`;
+	const subject = `Set your password for ${props.businessName} on NextUp`;
 	const text = [
-		`You have been invited to join ${props.businessName} on Loomline as ${role}.`,
+		`You have been invited to join ${props.businessName} on NextUp as ${role}.`,
 		'',
 		'Open this link to set your password and join:',
 		props.inviteUrl.trim(),
@@ -62,12 +62,12 @@ export function teamInviteEmail(props: TeamInviteProps): EmailMessage {
 	].join('\n');
 
 	const html = renderEmailLayout({
-		heading: `Join ${props.businessName}`,
-		preheader: `You are invited as ${role}`,
+		heading: 'Set your password',
+		preheader: `Join ${props.businessName} as ${role}`,
 		showHero: true,
-		cta: { label: 'Accept invite', url: props.inviteUrl.trim() },
+		cta: { label: 'Set your password', url: props.inviteUrl.trim() },
 		bodyHtml: `<p style="margin:0 0 12px;">You have been invited to join <strong>${escapeHtml(props.businessName)}</strong> as <strong>${escapeHtml(role)}</strong>.</p>
-<p style="margin:0 0 12px;">Set your password with the button below to get started.</p>
+<p style="margin:0 0 12px;">Use the button below to set your password and activate your account.</p>
 <p style="margin:0;font-size:13px;opacity:0.85;">This invite expires in ${days} days. If you did not expect this email, you can ignore it.</p>`
 	});
 
@@ -83,9 +83,9 @@ export type InviteReminderProps = {
 /** Reminder for a pending invite (stub until a reminder job exists). */
 export function inviteReminderEmail(props: InviteReminderProps): EmailMessage {
 	const days = props.expiresInDays ?? 7;
-	const subject = `Reminder: join ${props.businessName} on Loomline`;
+	const subject = `Reminder: join ${props.businessName} on NextUp`;
 	const text = [
-		`This is a reminder that you still have a pending invite to ${props.businessName} on Loomline.`,
+		`This is a reminder that you still have a pending invite to ${props.businessName} on NextUp.`,
 		'',
 		'Open this link to set your password and join:',
 		props.inviteUrl.trim(),
@@ -99,7 +99,7 @@ export function inviteReminderEmail(props: InviteReminderProps): EmailMessage {
 		preheader: `Finish joining ${props.businessName}`,
 		showHero: true,
 		cta: { label: 'Finish setup', url: props.inviteUrl.trim() },
-		bodyHtml: `<p style="margin:0 0 12px;">You still have a pending invite to <strong>${escapeHtml(props.businessName)}</strong> on Loomline.</p>
+		bodyHtml: `<p style="margin:0 0 12px;">You still have a pending invite to <strong>${escapeHtml(props.businessName)}</strong> on NextUp.</p>
 <p style="margin:0 0 12px;">Complete setup with the button below when you are ready.</p>
 <p style="margin:0;font-size:13px;opacity:0.85;">If you already joined, you can ignore this message.</p>`
 	});
@@ -116,7 +116,7 @@ export type WelcomeAfterAcceptProps = {
 /** Welcome after an invite is accepted (stub until wired at accept-invite). */
 export function welcomeAfterAcceptEmail(props: WelcomeAfterAcceptProps): EmailMessage {
 	const hello = props.recipientName?.trim() ? `Hello ${props.recipientName.trim()},` : 'Hello,';
-	const subject = `Welcome to ${props.businessName} on Loomline`;
+	const subject = `Welcome to ${props.businessName} on NextUp`;
 	const text = [
 		hello,
 		'',
@@ -128,7 +128,7 @@ export function welcomeAfterAcceptEmail(props: WelcomeAfterAcceptProps): EmailMe
 	].join('\n');
 
 	const html = renderEmailLayout({
-		heading: 'Welcome to Loomline',
+		heading: 'Welcome to NextUp',
 		preheader: `${props.businessName} is ready for you`,
 		showHero: true,
 		cta: { label: 'Open dashboard', url: props.dashboardUrl.trim() },

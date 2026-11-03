@@ -105,7 +105,7 @@ export const load: PageServerLoad = async ({ params }) => {
 
 	return {
 		device,
-		businessName: biz?.name ?? 'Loomline',
+		businessName: biz?.name ?? 'NextUp',
 		businessImageUrl: biz?.imageUrl ?? null,
 		departmentName,
 		boundQueueIds,

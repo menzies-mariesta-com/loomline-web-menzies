@@ -17,7 +17,7 @@ export function ticketIssuedEmail(props: TicketIssuedProps): EmailMessage {
 	const trackUrl = ticketTrackUrl(props.publicToken);
 	const subject = `Your ticket ${props.ticketNumber} at ${props.businessName}`;
 	const text = [
-		`Your Loomline ticket is ${props.ticketNumber}${props.siteName ? ` (${props.siteName})` : ''}.`,
+		`Your NextUp ticket is ${props.ticketNumber}${props.siteName ? ` (${props.siteName})` : ''}.`,
 		'',
 		`Track your place in line:`,
 		trackUrl,

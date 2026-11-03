@@ -49,9 +49,9 @@ export class EmailNotificationAdapter implements NotificationPort {
 			});
 		}
 		const body =
-			typeof payload.body === 'string' ? payload.body : `Loomline: ${input.templateKey}`;
+			typeof payload.body === 'string' ? payload.body : `NextUp: ${input.templateKey}`;
 		const subject =
-			typeof payload.subject === 'string' ? payload.subject : `Loomline: ${input.templateKey}`;
+			typeof payload.subject === 'string' ? payload.subject : `NextUp: ${input.templateKey}`;
 		const html = typeof payload.html === 'string' ? payload.html : undefined;
 		return sendEmail({ to: input.toAddress, subject, text: body, html });
 	}
@@ -72,7 +72,7 @@ export class TwilioNotificationAdapter implements NotificationPort {
 		const body =
 			typeof input.payload?.body === 'string'
 				? input.payload.body
-				: `Loomline: ${input.templateKey}`;
+				: `NextUp: ${input.templateKey}`;
 
 		const url = `https://api.twilio.com/2010-04-01/Accounts/${this.accountSid}/Messages.json`;
 		const auth = Buffer.from(`${this.accountSid}:${this.authToken}`).toString('base64');

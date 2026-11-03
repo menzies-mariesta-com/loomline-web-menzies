@@ -1,6 +1,6 @@
 User-agent: *
 Allow: /
-Allow: /og-loomline.png
+Allow: /og-nextup.png
 Disallow: /auth/
 Disallow: /admin/
 Disallow: /workspaces/

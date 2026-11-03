@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ChevronDown, Search } from '@lucide/svelte';
-	import { closeDetailsOnOutside } from '#lib/attachments/close-details-on-outside';
+	import { floatingPanelPortal } from '#lib/attachments/floating-panel-portal';
 
 	type SearchSelectOption = {
 		value: string;
@@ -16,13 +16,10 @@
 		placeholder?: string;
 		filterPlaceholder?: string;
 		disabled?: boolean;
-		/** When true, empty value is allowed. */
 		allowEmpty?: boolean;
 		emptyLabel?: string;
 		ariaLabel?: string;
-		/** Use monospace for trigger/option text (e.g. timezones). */
 		mono?: boolean;
-		/** Soft Wash trigger density: md (forms), sm/xs (table filters / compact). */
 		size?: 'md' | 'sm' | 'xs';
 		class?: string;
 	};
@@ -47,7 +44,9 @@
 	let open = $state(false);
 	let filter = $state('');
 	let highlight = $state(0);
-	let panelRoot = $state<HTMLDetailsElement | null>(null);
+	let rootEl = $state<HTMLDivElement | null>(null);
+	let triggerEl = $state<HTMLButtonElement | null>(null);
+	let filterInput = $state<HTMLInputElement | null>(null);
 
 	type Row = { kind: 'empty' } | { kind: 'option'; option: SearchSelectOption };
 
@@ -76,7 +75,7 @@
 		const density =
 			size === 'xs' ? 'input-xs min-h-8 py-1' : size === 'sm' ? 'input-sm min-h-9' : 'min-h-10';
 		return [
-			'input input-bordered flex w-full cursor-pointer items-center justify-between gap-2 [&::-webkit-details-marker]:hidden',
+			'input input-bordered flex w-full cursor-pointer items-center justify-between gap-2 text-left',
 			density,
 			!value ? 'text-base-content/50' : '',
 			className
@@ -89,6 +88,31 @@
 		size === 'md' ? 'input input-sm input-bordered' : 'input input-xs input-bordered'
 	);
 
+	const portalOpts = $derived({
+		getAnchor: () => triggerEl,
+		getOpen: () => open && !disabled,
+		minWidth: 200
+	});
+
+	function closePanel() {
+		open = false;
+		filter = '';
+		highlight = 0;
+	}
+
+	function openPanel() {
+		if (disabled) return;
+		open = true;
+		filter = '';
+		highlight = 0;
+		queueMicrotask(() => filterInput?.focus());
+	}
+
+	function togglePanel() {
+		if (open) closePanel();
+		else openPanel();
+	}
+
 	function setFilter(next: string) {
 		filter = next;
 		highlight = 0;
@@ -96,16 +120,12 @@
 
 	function selectValue(next: string) {
 		value = next;
-		open = false;
-		filter = '';
-		highlight = 0;
+		closePanel();
 	}
 
 	function selectEmpty() {
 		value = '';
-		open = false;
-		filter = '';
-		highlight = 0;
+		closePanel();
 	}
 
 	function pickRow(row: Row) {
@@ -113,28 +133,21 @@
 		else selectValue(row.option.value);
 	}
 
-	function onToggle(e: Event) {
-		const el = e.currentTarget as HTMLDetailsElement;
-		panelRoot = el;
-		if (!el.open) {
-			filter = '';
-			highlight = 0;
-			return;
-		}
-		queueMicrotask(() => {
-			el.querySelector<HTMLInputElement>('input[type="search"]')?.focus();
-		});
-	}
-
 	function scrollHighlightIntoView() {
 		queueMicrotask(() => {
-			panelRoot
+			document
+				.getElementById(`${id}-listbox`)
 				?.querySelector<HTMLElement>(`[data-idx="${highlight}"]`)
 				?.scrollIntoView({ block: 'nearest' });
 		});
 	}
 
 	function onFilterKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') {
+			e.preventDefault();
+			closePanel();
+			return;
+		}
 		if (e.key === 'ArrowDown') {
 			e.preventDefault();
 			if (rows.length === 0) return;
@@ -155,92 +168,105 @@
 			if (row) pickRow(row);
 		}
 	}
+
+	$effect(() => {
+		if (!open) return;
+		function onPointerDown(e: PointerEvent) {
+			const t = e.target;
+			if (t instanceof Node && rootEl?.contains(t)) return;
+			const panel = document.getElementById(`${id}-panel`);
+			if (t instanceof Node && panel?.contains(t)) return;
+			closePanel();
+		}
+		document.addEventListener('pointerdown', onPointerDown, true);
+		return () => document.removeEventListener('pointerdown', onPointerDown, true);
+	});
 </script>
 
-<div class="relative w-full">
+<div bind:this={rootEl} class="relative w-full">
 	<input type="hidden" {name} {value} {required} />
-	<details
-		class="dropdown w-full"
-		bind:open
-		{@attach closeDetailsOnOutside()}
-		ontoggle={onToggle}
+	<button
+		bind:this={triggerEl}
+		type="button"
+		{id}
+		class={triggerClass}
+		class:cursor-not-allowed={disabled}
+		class:opacity-60={disabled}
+		disabled={disabled}
+		aria-haspopup="listbox"
+		aria-expanded={open}
+		aria-controls={open ? `${id}-listbox` : undefined}
+		aria-label={ariaLabel}
+		onclick={togglePanel}
 	>
-		<summary
-			{id}
-			class={triggerClass}
-			class:cursor-not-allowed={disabled}
-			class:opacity-60={disabled}
-			aria-haspopup="listbox"
-			aria-expanded={open}
-			aria-controls={`${id}-listbox`}
-			aria-disabled={disabled}
-			aria-label={ariaLabel}
-			onclick={(e) => {
-				if (disabled) e.preventDefault();
-			}}
+		<span class="truncate text-sm" class:font-mono={mono}>{selectedLabel}</span>
+		<ChevronDown
+			class="size-4 shrink-0 opacity-60 transition-transform {open ? 'rotate-180' : ''}"
+			aria-hidden="true"
+		/>
+	</button>
+
+	{#if open && !disabled}
+		<div
+			id="{id}-panel"
+			class="border-base-300 bg-base-100 rounded-box border p-2 shadow-lg"
+			role="presentation"
+			{@attach floatingPanelPortal(portalOpts)}
 		>
-			<span class="truncate text-sm" class:font-mono={mono}>{selectedLabel}</span>
-			<ChevronDown class="size-4 shrink-0 opacity-60" aria-hidden="true" />
-		</summary>
-		{#if open && !disabled}
-			<div
-				class="dropdown-content bg-base-100 rounded-box border-base-300 absolute inset-x-0 z-[100] mt-1 w-full min-w-full border p-2 shadow-lg"
-				role="presentation"
-			>
-				<div class="{filterInputClass} mb-2 flex w-full items-center gap-2">
-					<Search class="size-4 shrink-0 opacity-50" aria-hidden="true" />
-					<input
-						type="search"
-						class="grow cursor-text bg-transparent outline-none"
-						placeholder={filterPlaceholder}
-						value={filter}
-						oninput={(e) => setFilter(e.currentTarget.value)}
-						onkeydown={onFilterKeydown}
-						autocomplete="off"
-						aria-label={filterPlaceholder}
-						aria-autocomplete="list"
-						aria-controls={`${id}-listbox`}
-						aria-activedescendant={rows[highlight] ? `${id}-opt-${highlight}` : undefined}
-					/>
-				</div>
-				<ul
-					id={`${id}-listbox`}
-					class="menu max-h-48 w-full flex-nowrap overflow-y-auto p-0"
-					role="listbox"
-					aria-label={ariaLabel}
-				>
-					{#if rows.length === 0}
-						<li class="disabled">
-							<span class="cursor-default text-sm opacity-60">No matches</span>
-						</li>
-					{:else}
-						{#each rows as row, i (row.kind === 'empty' ? '__empty__' : row.option.value)}
-							<li
-								role="option"
-								aria-selected={highlight === i}
-								data-idx={i}
-								id={`${id}-opt-${i}`}
-							>
-								<button
-									type="button"
-									class="cursor-pointer text-sm"
-									class:font-mono={mono}
-									class:bg-primary={highlight === i}
-									class:text-primary-content={highlight === i}
-									class:active={
-										(row.kind === 'empty' && !value) ||
-										(row.kind === 'option' && row.option.value === value)
-									}
-									onmouseenter={() => (highlight = i)}
-									onclick={() => pickRow(row)}
-								>
-									{row.kind === 'empty' ? emptyLabel : row.option.label}
-								</button>
-							</li>
-						{/each}
-					{/if}
-				</ul>
+			<div class="{filterInputClass} mb-2 flex w-full items-center gap-2">
+				<Search class="size-4 shrink-0 opacity-50" aria-hidden="true" />
+				<input
+					bind:this={filterInput}
+					type="search"
+					class="grow cursor-text bg-transparent outline-none"
+					placeholder={filterPlaceholder}
+					value={filter}
+					oninput={(e) => setFilter(e.currentTarget.value)}
+					onkeydown={onFilterKeydown}
+					autocomplete="off"
+					aria-label={filterPlaceholder}
+					aria-autocomplete="list"
+					aria-controls={`${id}-listbox`}
+					aria-activedescendant={rows[highlight] ? `${id}-opt-${highlight}` : undefined}
+				/>
 			</div>
-		{/if}
-	</details>
+			<ul
+				id={`${id}-listbox`}
+				class="menu max-h-48 w-full flex-nowrap overflow-y-auto p-0"
+				role="listbox"
+				aria-label={ariaLabel}
+			>
+				{#if rows.length === 0}
+					<li class="disabled">
+						<span class="text-ink-muted cursor-default text-sm">No matches</span>
+					</li>
+				{:else}
+					{#each rows as row, i (row.kind === 'empty' ? '__empty__' : row.option.value)}
+						<li
+							role="option"
+							aria-selected={highlight === i}
+							data-idx={i}
+							id={`${id}-opt-${i}`}
+						>
+							<button
+								type="button"
+								class="cursor-pointer text-sm"
+								class:font-mono={mono}
+								class:bg-primary={highlight === i}
+								class:text-primary-content={highlight === i}
+								class:active={
+									(row.kind === 'empty' && !value) ||
+									(row.kind === 'option' && row.option.value === value)
+								}
+								onmouseenter={() => (highlight = i)}
+								onclick={() => pickRow(row)}
+							>
+								{row.kind === 'empty' ? emptyLabel : row.option.label}
+							</button>
+						</li>
+					{/each}
+				{/if}
+			</ul>
+		</div>
+	{/if}
 </div>

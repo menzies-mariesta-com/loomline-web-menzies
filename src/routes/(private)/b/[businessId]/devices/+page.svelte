@@ -21,6 +21,9 @@
 	import { shortDateTime } from '#lib/util/format';
 	import DataTableShell from '#lib/component/own/local/private/data-table/DataTableShell.svelte';
 	import SearchSelect from '#lib/component/own/local/private/SearchSelect.svelte';
+	import ToastDismissButton from '#lib/component/own/local/private/ToastDismissButton.svelte';
+	import IconActionTip from '#lib/component/wash/tooltip/IconActionTip.svelte';
+	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
 
 	let { data, form } = $props();
 
@@ -196,11 +199,7 @@
 				<CircleX class="h-5 w-5 shrink-0" aria-hidden="true" />
 			{/if}
 			<span>{form.message}</span>
-			<button
-				type="button"
-				class="btn btn-ghost btn-xs cursor-pointer"
-				onclick={() => (toastGone = true)}>Dismiss</button
-			>
+			<ToastDismissButton onclick={() => (toastGone = true)} />
 		</div>
 	</div>
 {/if}
@@ -213,8 +212,8 @@
 		footerSummary={footerSummary}
 	>
 		{#snippet headerActions()}
-			<div class="tooltip tooltip-bottom tooltip-secondary" data-tip="Refresh">
-				<button
+			<WashTooltip tooltipText="Refresh" className="tooltip-secondary">
+<button
 					type="button"
 					class="btn btn-ghost btn-square btn-sm btn-secondary"
 					class:cursor-pointer={!refreshing}
@@ -230,9 +229,9 @@
 						<RefreshCw class="size-4" aria-hidden="true" />
 					{/if}
 				</button>
-			</div>
-			<div class="tooltip tooltip-left tooltip-primary" data-tip="Pair device">
-				<button
+</WashTooltip>
+			<WashTooltip tooltipText="Pair device" className="tooltip-primary">
+<button
 					type="button"
 					class="btn btn-ghost btn-square btn-sm btn-primary cursor-pointer"
 					aria-label="Pair device"
@@ -240,7 +239,7 @@
 				>
 					<Plus class="size-4" aria-hidden="true" />
 				</button>
-			</div>
+</WashTooltip>
 		{/snippet}
 
 		<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
@@ -315,8 +314,8 @@
 							<td>
 								<div class="flex flex-wrap items-center gap-0.5">
 									{#if d.type === 'tv'}
-										<div class="tooltip tooltip-primary tooltip-right" data-tip="Open TV">
-											<a
+										<IconActionTip tip="Open TV" tone="primary">
+<a
 												class="btn btn-ghost btn-square btn-xs btn-primary cursor-pointer"
 												href={resolve(`/display/${d.pairingCode}`)}
 												target="_blank"
@@ -325,11 +324,12 @@
 											>
 												<Monitor class="size-3.5" aria-hidden="true" />
 											</a>
-										</div>
+										</IconActionTip>
+
 									{/if}
 									{#if d.type === 'kiosk'}
-										<div class="tooltip tooltip-primary tooltip-right" data-tip="Open kiosk">
-											<a
+										<IconActionTip tip="Open kiosk" tone="primary">
+<a
 												class="btn btn-ghost btn-square btn-xs btn-primary cursor-pointer"
 												href={resolve(`/kiosk/${d.pairingCode}`)}
 												target="_blank"
@@ -338,10 +338,11 @@
 											>
 												<Tablet class="size-3.5" aria-hidden="true" />
 											</a>
-										</div>
+										</IconActionTip>
+
 									{/if}
-									<div class="tooltip tooltip-secondary tooltip-right" data-tip="Edit">
-										<button
+									<IconActionTip tip="Edit" tone="secondary">
+<button
 											type="button"
 											class="btn btn-ghost btn-square btn-xs btn-secondary cursor-pointer"
 											aria-label="Edit"
@@ -349,7 +350,8 @@
 										>
 											<Pencil class="size-3.5" aria-hidden="true" />
 										</button>
-									</div>
+									</IconActionTip>
+
 									{#if d.type !== 'agent'}
 										<form
 											method="POST"
@@ -357,11 +359,8 @@
 											use:enhance={bindSubmitting((v) => (regeneratingId = v ? d.id : null))}
 										>
 											<input type="hidden" name="id" value={d.id} />
-											<div
-												class="tooltip tooltip-secondary tooltip-right"
-												data-tip="New pairing code"
-											>
-												<button
+											<IconActionTip tip="New pairing code" tone="secondary">
+<button
 													type="submit"
 													class="btn btn-ghost btn-square btn-xs btn-secondary"
 													class:cursor-pointer={regeneratingId !== d.id}
@@ -376,7 +375,8 @@
 														<KeyRound class="size-3.5" aria-hidden="true" />
 													{/if}
 												</button>
-											</div>
+											</IconActionTip>
+
 										</form>
 									{/if}
 									{#if d.isActive}
@@ -386,8 +386,8 @@
 											use:enhance={bindSubmitting((v) => (revokingId = v ? d.id : null))}
 										>
 											<input type="hidden" name="id" value={d.id} />
-											<div class="tooltip tooltip-error tooltip-right" data-tip="Revoke">
-												<button
+											<IconActionTip tip="Revoke" tone="error">
+<button
 													type="submit"
 													class="btn btn-ghost btn-square btn-xs btn-error"
 													class:cursor-pointer={revokingId !== d.id}
@@ -402,7 +402,8 @@
 														<Ban class="size-3.5" aria-hidden="true" />
 													{/if}
 												</button>
-											</div>
+											</IconActionTip>
+
 										</form>
 									{:else}
 										<form
@@ -411,8 +412,8 @@
 											use:enhance={bindSubmitting((v) => (revokingId = v ? d.id : null))}
 										>
 											<input type="hidden" name="id" value={d.id} />
-											<div class="tooltip tooltip-success tooltip-right" data-tip="Reactivate">
-												<button
+											<IconActionTip tip="Reactivate" tone="success">
+<button
 													type="submit"
 													class="btn btn-ghost btn-square btn-xs btn-success"
 													class:cursor-pointer={revokingId !== d.id}
@@ -427,11 +428,12 @@
 														<Power class="size-3.5" aria-hidden="true" />
 													{/if}
 												</button>
-											</div>
+											</IconActionTip>
+
 										</form>
 									{/if}
-									<div class="tooltip tooltip-error tooltip-right" data-tip="Delete">
-										<button
+									<IconActionTip tip="Delete" tone="error">
+<button
 											type="button"
 											class="btn btn-ghost btn-square btn-xs btn-error cursor-pointer"
 											aria-label="Delete"
@@ -439,7 +441,8 @@
 										>
 											<Trash2 class="size-3.5" aria-hidden="true" />
 										</button>
-									</div>
+									</IconActionTip>
+
 								</div>
 							</td>
 							<td>{(safePage - 1) * pageSize + i + 1}</td>

@@ -44,7 +44,7 @@
 	class="border-base-300 rounded-box flex min-h-0 flex-col overflow-hidden border bg-base-100 {washRecipes.tableChrome} {className}"
 >
 	<div
-		class="border-base-300 bg-base-100 relative z-20 flex shrink-0 items-center justify-between gap-3 overflow-visible border-b px-3 py-2.5"
+		class="border-base-300 bg-base-100 relative z-10 flex shrink-0 items-center justify-between gap-3 overflow-visible border-b px-3 py-2.5"
 	>
 		<div class="min-w-0 flex-1">
 			<h2 class="text-base-content text-base leading-tight font-bold">{title}</h2>
@@ -59,7 +59,7 @@
 		{/if}
 	</div>
 
-	<div class="min-h-0 flex-1 overflow-auto" bind:this={bodyEl}>
+	<div class="menzies-table-scroll min-h-0 flex-1 overflow-auto" bind:this={bodyEl}>
 		{@render children()}
 	</div>
 

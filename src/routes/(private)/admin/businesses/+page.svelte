@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import {
 		Ban,
 		CircleCheck,
 		CircleX,
 		ExternalLink,
+		Logs,
 		Pencil,
 		Plus,
 		RefreshCw,
@@ -20,11 +20,27 @@
 	import DateRangeFilter from '#lib/component/own/local/private/data-table/DateRangeFilter.svelte';
 	import SearchSelect from '#lib/component/own/local/private/SearchSelect.svelte';
 	import TimezoneSearchSelect from '#lib/component/own/local/private/TimezoneSearchSelect.svelte';
+	import ToastDismissButton from '#lib/component/own/local/private/ToastDismissButton.svelte';
+	import { PAID_PLAN_OPTIONS, TRIAL_DURATION_OPTIONS, planKeyLabel } from '#lib/tool/plans';
+	import IconActionTip from '#lib/component/wash/tooltip/IconActionTip.svelte';
+	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
 
 	const statusOptions = [
 		{ value: 'active', label: 'active' },
 		{ value: 'suspended', label: 'suspended' },
-		{ value: 'pending', label: 'pending' }
+		{ value: 'pending', label: 'pending' },
+		{ value: 'inactive', label: 'inactive' },
+		{ value: 'trial_expired', label: 'trial_expired' }
+	];
+
+	const planOptions = PAID_PLAN_OPTIONS;
+	const trialDurationOptions = TRIAL_DURATION_OPTIONS.map((o) => ({
+		value: o.value,
+		label: o.label
+	}));
+	const accessKindOptions = [
+		{ value: 'plan', label: 'Paid plan (Cloud / On-premise)' },
+		{ value: 'trial', label: 'Trial' }
 	];
 
 	let { data, form } = $props();
@@ -48,6 +64,7 @@
 	let templateFilter = $state('');
 	let configFilter = $state('');
 	let statusFilter = $state('');
+	let planFilter = $state('');
 	let createdRange = $state('');
 	let updatedRange = $state('');
 	let toastGone = $state(false);
@@ -57,10 +74,16 @@
 	let createTimezoneOverride = $state('');
 	let createTemplateId = $state('');
 	let createConfigId = $state('');
+	let createAccessKind = $state('plan');
+	let createPlanKey = $state('cloud_starter');
+	let createTrialDuration = $state('7d');
 	let editTimezone = $state('');
 	let editTemplateId = $state('');
 	let editConfigId = $state('');
 	let editStatus = $state('active');
+	let editAccessKind = $state('plan');
+	let editPlanKey = $state('cloud_starter');
+	let editTrialDuration = $state('7d');
 
 	const templateOptions = $derived(
 		data.templates.map((t) => ({ value: t.id, label: t.name }))
@@ -87,9 +110,15 @@
 			const configName = b.config?.name ?? '';
 			const configOk = !configQ || configName.toLowerCase().includes(configQ);
 			const statusOk = !statusFilter || b.status === statusFilter;
+			const planQ = planFilter.trim().toLowerCase();
+			const planLabel = planKeyLabel(b.planKey).toLowerCase();
+			const planOk =
+				!planQ ||
+				(b.planKey ?? '').toLowerCase().includes(planQ) ||
+				planLabel.includes(planQ);
 			const createdOk = inDateRange(b.createdAt, createdRange);
 			const updatedOk = inDateRange(b.updatedAt, updatedRange);
-			return nameOk && templateOk && configOk && statusOk && createdOk && updatedOk;
+			return nameOk && templateOk && configOk && statusOk && planOk && createdOk && updatedOk;
 		})
 	);
 
@@ -115,6 +144,7 @@
 		if (status === 'active') return washRecipes.badgeSoft('success');
 		if (status === 'suspended') return washRecipes.badgeSoft('error');
 		if (status === 'pending') return washRecipes.badgeSoft('warning');
+		if (status === 'inactive' || status === 'trial_expired') return 'badge badge-ghost';
 		return 'badge badge-ghost';
 	}
 
@@ -122,6 +152,9 @@
 		createTimezoneOverride = '';
 		createTemplateId = data.templates[0]?.id ?? '';
 		createConfigId = '';
+		createAccessKind = 'plan';
+		createPlanKey = 'cloud_starter';
+		createTrialDuration = '7d';
 		createDialog?.showModal();
 	}
 
@@ -139,6 +172,10 @@
 		editTemplateId = row.industryPackId ?? '';
 		editConfigId = row.configId ?? '';
 		editStatus = row.status;
+		editAccessKind = row.planKey === 'trial' ? 'trial' : 'plan';
+		editPlanKey =
+			row.planKey && row.planKey !== 'trial' ? row.planKey : 'cloud_starter';
+		editTrialDuration = row.trialDuration ?? '7d';
 		if (editImagePreview) {
 			URL.revokeObjectURL(editImagePreview);
 			editImagePreview = null;
@@ -187,6 +224,7 @@
 			templateFilter = '';
 			configFilter = '';
 			statusFilter = '';
+			planFilter = '';
 			createdRange = '';
 			updatedRange = '';
 			page = 1;
@@ -201,6 +239,7 @@
 		templateFilter;
 		configFilter;
 		statusFilter;
+		planFilter;
 		createdRange;
 		updatedRange;
 		page = 1;
@@ -231,7 +270,7 @@
 </script>
 
 <svelte:head>
-	<title>Businesses | Loomline Admin</title>
+	<title>Businesses | NextUp Admin</title>
 	<meta name="robots" content="noindex,nofollow" />
 </svelte:head>
 
@@ -249,19 +288,15 @@
 					<CircleX class="h-5 w-5 shrink-0" aria-hidden="true" />
 				{/if}
 				<span>{form.message}</span>
-				<button
-					type="button"
-					class="btn btn-ghost btn-xs cursor-pointer"
-					onclick={() => (toastGone = true)}>Dismiss</button
-				>
+				<ToastDismissButton onclick={() => (toastGone = true)} />
 			</div>
 		</div>
 	{/if}
 
 	<DataTableShell title="Businesses" bind:bodyEl footerSummary={footerSummary}>
 		{#snippet headerActions()}
-			<div class="tooltip tooltip-bottom tooltip-secondary" data-tip="Refresh">
-				<button
+			<WashTooltip tooltipText="Refresh" className="tooltip-secondary">
+<button
 					type="button"
 					class="btn btn-ghost btn-square btn-sm btn-secondary"
 					class:cursor-pointer={!refreshing}
@@ -277,9 +312,9 @@
 						<RefreshCw class="size-4" aria-hidden="true" />
 					{/if}
 				</button>
-			</div>
-			<div class="tooltip tooltip-left tooltip-primary" data-tip="Add">
-				<button
+</WashTooltip>
+			<WashTooltip tooltipText="Add" className="tooltip-primary">
+<button
 					type="button"
 					class="btn btn-ghost btn-square btn-sm btn-primary cursor-pointer"
 					aria-label="Add"
@@ -287,7 +322,7 @@
 				>
 					<Plus class="size-4" aria-hidden="true" />
 				</button>
-			</div>
+</WashTooltip>
 		{/snippet}
 
 		<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
@@ -296,6 +331,7 @@
 					<th>Actions</th>
 					<th>No</th>
 					<th>Name</th>
+					<th>Plan</th>
 					<th>Template</th>
 					<th>Config</th>
 					<th>Status</th>
@@ -312,6 +348,15 @@
 							placeholder="Filter…"
 							aria-label="Filter by name or slug"
 							bind:value={nameFilter}
+						/>
+					</th>
+					<th>
+						<input
+							type="text"
+							class="input input-xs input-bordered w-full max-w-[8rem] cursor-text"
+							placeholder="Filter…"
+							aria-label="Filter by plan"
+							bind:value={planFilter}
 						/>
 					</th>
 					<th>
@@ -343,7 +388,9 @@
 							options={[
 								{ value: 'active', label: 'active' },
 								{ value: 'suspended', label: 'suspended' },
-								{ value: 'pending', label: 'pending' }
+								{ value: 'pending', label: 'pending' },
+								{ value: 'inactive', label: 'inactive' },
+								{ value: 'trial_expired', label: 'trial_expired' }
 							]}
 							ariaLabel="Filter by status"
 							class="max-w-[7rem]"
@@ -360,7 +407,7 @@
 			<tbody>
 				{#if pageRows.length === 0}
 					<tr>
-						<td colspan="8" class="text-ink-muted py-10 text-center text-sm">
+						<td colspan="9" class="text-ink-muted py-10 text-center text-sm">
 							No businesses match these filters.
 						</td>
 					</tr>
@@ -369,8 +416,8 @@
 						<tr>
 							<td>
 								<div class="flex items-center gap-0.5">
-									<div class="tooltip tooltip-secondary tooltip-right" data-tip="Edit">
-										<button
+									<IconActionTip tip="Edit" tone="secondary">
+<button
 											type="button"
 											class="btn btn-ghost btn-square btn-xs btn-secondary cursor-pointer"
 											aria-label="Edit"
@@ -378,9 +425,10 @@
 										>
 											<Pencil class="size-3.5" aria-hidden="true" />
 										</button>
-									</div>
-									<div class="tooltip tooltip-error tooltip-right" data-tip="Delete">
-										<button
+									</IconActionTip>
+
+									<IconActionTip tip="Delete" tone="error">
+<button
 											type="button"
 											class="btn btn-ghost btn-square btn-xs btn-error cursor-pointer"
 											aria-label="Delete"
@@ -388,16 +436,28 @@
 										>
 											<Trash2 class="size-3.5" aria-hidden="true" />
 										</button>
-									</div>
-									<div class="tooltip tooltip-primary tooltip-right" data-tip="Open console">
-										<a
+									</IconActionTip>
+
+									<IconActionTip tip="Open console" tone="primary">
+<a
 											class="btn btn-ghost btn-square btn-xs btn-primary cursor-pointer"
-											href={resolve(`/b/${b.id}`)}
+											href={`/b/${b.id}`}
 											aria-label="Open console"
 										>
 											<ExternalLink class="size-3.5" aria-hidden="true" />
 										</a>
-									</div>
+									</IconActionTip>
+
+									<IconActionTip tip="View logs" tone="info">
+<a
+											class="btn btn-ghost btn-square btn-xs btn-info cursor-pointer"
+											href={`/b/${b.id}/logs`}
+											aria-label="View logs"
+										>
+											<Logs class="size-3.5" aria-hidden="true" />
+										</a>
+									</IconActionTip>
+
 									{#if b.status === 'active'}
 										<form
 											method="POST"
@@ -410,8 +470,8 @@
 											)}
 										>
 											<input type="hidden" name="businessId" value={b.id} />
-											<div class="tooltip tooltip-warning tooltip-right" data-tip="Suspend">
-												<button
+											<IconActionTip tip="Suspend" tone="warning">
+<button
 													type="submit"
 													class="btn btn-ghost btn-square btn-xs btn-warning"
 													class:cursor-pointer={busyId !== b.id}
@@ -425,7 +485,8 @@
 														<Ban class="size-3.5" aria-hidden="true" />
 													{/if}
 												</button>
-											</div>
+											</IconActionTip>
+
 										</form>
 									{:else}
 										<form
@@ -439,8 +500,8 @@
 											)}
 										>
 											<input type="hidden" name="businessId" value={b.id} />
-											<div class="tooltip tooltip-success tooltip-right" data-tip="Activate">
-												<button
+											<IconActionTip tip="Activate" tone="success">
+<button
 													type="submit"
 													class="btn btn-ghost btn-square btn-xs btn-success"
 													class:cursor-pointer={busyId !== b.id}
@@ -454,7 +515,8 @@
 														<CircleCheck class="size-3.5" aria-hidden="true" />
 													{/if}
 												</button>
-											</div>
+											</IconActionTip>
+
 										</form>
 									{/if}
 								</div>
@@ -475,6 +537,14 @@
 										<div class="font-medium">{b.name}</div>
 										<div class="text-ink-muted text-xs">{b.slug}</div>
 									</div>
+								</div>
+							</td>
+							<td>
+								<div class="min-w-0">
+									<div class="text-sm">{planKeyLabel(b.planKey)}</div>
+									{#if b.planKey === 'trial' && b.trialDuration}
+										<div class="text-ink-muted text-xs">{b.trialDuration}</div>
+									{/if}
 								</div>
 							</td>
 							<td>{b.industryPack?.name ?? '-'}</td>
@@ -589,6 +659,57 @@
 					required
 				/>
 			</label>
+			<label class="form-control flex w-full flex-col" for="biz-access-kind">
+				<span class="label-text mb-1">
+					Access<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span>
+				</span>
+				<SearchSelect
+					id="biz-access-kind"
+					name="accessKind"
+					options={accessKindOptions}
+					bind:value={createAccessKind}
+					required
+					placeholder="Select access..."
+					filterPlaceholder="Search..."
+					ariaLabel="Access kind"
+				/>
+			</label>
+			{#if createAccessKind === 'trial'}
+				<label class="form-control flex w-full flex-col" for="biz-trial-duration">
+					<span class="label-text mb-1">
+						Trial duration<span
+							class="text-error align-top text-sm leading-none"
+							aria-hidden="true">*</span
+						>
+					</span>
+					<SearchSelect
+						id="biz-trial-duration"
+						name="trialDuration"
+						options={trialDurationOptions}
+						bind:value={createTrialDuration}
+						required
+						placeholder="Select duration..."
+						filterPlaceholder="Search..."
+						ariaLabel="Trial duration"
+					/>
+				</label>
+			{:else}
+				<label class="form-control flex w-full flex-col" for="biz-plan-key">
+					<span class="label-text mb-1">
+						Plan<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span>
+					</span>
+					<SearchSelect
+						id="biz-plan-key"
+						name="planKey"
+						options={planOptions}
+						bind:value={createPlanKey}
+						required
+						placeholder="Select plan..."
+						filterPlaceholder="Search plans..."
+						ariaLabel="Plan"
+					/>
+				</label>
+			{/if}
 			<label class="form-control flex w-full flex-col" for="biz-image">
 				<span class="label-text mb-1">Organization image</span>
 				<input
@@ -800,6 +921,61 @@
 						ariaLabel="Status"
 					/>
 				</label>
+				<label class="form-control flex w-full flex-col" for="edit-biz-access-kind">
+					<span class="label-text mb-1">
+						Access<span class="text-error align-top text-sm leading-none" aria-hidden="true"
+							>*</span
+						>
+					</span>
+					<SearchSelect
+						id="edit-biz-access-kind"
+						name="accessKind"
+						options={accessKindOptions}
+						bind:value={editAccessKind}
+						required
+						placeholder="Select access..."
+						filterPlaceholder="Search..."
+						ariaLabel="Access kind"
+					/>
+				</label>
+				{#if editAccessKind === 'trial'}
+					<label class="form-control flex w-full flex-col" for="edit-biz-trial-duration">
+						<span class="label-text mb-1">
+							Trial duration<span
+								class="text-error align-top text-sm leading-none"
+								aria-hidden="true">*</span
+							>
+						</span>
+						<SearchSelect
+							id="edit-biz-trial-duration"
+							name="trialDuration"
+							options={trialDurationOptions}
+							bind:value={editTrialDuration}
+							required
+							placeholder="Select duration..."
+							filterPlaceholder="Search..."
+							ariaLabel="Trial duration"
+						/>
+					</label>
+				{:else}
+					<label class="form-control flex w-full flex-col" for="edit-biz-plan">
+						<span class="label-text mb-1">
+							Plan<span class="text-error align-top text-sm leading-none" aria-hidden="true"
+								>*</span
+							>
+						</span>
+						<SearchSelect
+							id="edit-biz-plan"
+							name="planKey"
+							options={planOptions}
+							bind:value={editPlanKey}
+							required
+							placeholder="Select plan..."
+							filterPlaceholder="Search plans..."
+							ariaLabel="Plan"
+						/>
+					</label>
+				{/if}
 				<div class="modal-action mt-2 justify-end">
 					<button
 						type="button"

@@ -31,6 +31,11 @@ export const variables = defineEnvVars({
 	SMTP_USER: { description: 'SMTP user.', ...optionalString },
 	SMTP_PASS: { description: 'SMTP password.', ...optionalString },
 	SMTP_FROM: { description: 'SMTP from address.', ...optionalString },
+	TRIAL_REQUEST_INBOX: {
+		description:
+			'Inbox for pricing trial request notifications (default: zarnihlawn@outlook.com).',
+		...optionalString
+	},
 	AWS_ACCESS_KEY_ID: {
 		description: 'Neon Object Storage (S3) access key id.',
 		...optionalString

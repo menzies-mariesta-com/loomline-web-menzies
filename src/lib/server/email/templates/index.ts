@@ -6,8 +6,10 @@
  * - team_invite → teamInviteEmail
  * - invite_reminder → inviteReminderEmail (stub sender)
  * - welcome_after_accept → welcomeAfterAcceptEmail (stub sender)
- * - password_reset → passwordResetEmail (stub; better-auth not wired yet)
+ * - password_reset → passwordResetEmail (better-auth sendResetPassword)
  * - password_changed → passwordChangedEmail (stub)
+ * - trial_otp → trialOtpEmail
+ * - trial_request_notify → trialRequestNotifyEmail
  * - ticket_issued → ticketIssuedEmail
  * - ticket_called → ticketCalledEmail
  * - almost_your_turn → almostYourTurnEmail
@@ -37,6 +39,7 @@ import {
 	ticketCompletedEmail,
 	ticketIssuedEmail
 } from '#lib/server/email/templates/ticket';
+import { trialOtpEmail, trialRequestNotifyEmail } from '#lib/server/email/templates/trial';
 import { transactionalFallbackEmail } from '#lib/server/email/templates/transactional';
 import type { EmailMessage } from '#lib/server/email/templates/types';
 import { siteOrigin } from '#lib/server/email/brand';
@@ -62,6 +65,7 @@ export {
 	appointmentCancelledEmail
 } from '#lib/server/email/templates/appointment';
 export { stationAccountCreatedEmail } from '#lib/server/email/templates/station';
+export { trialOtpEmail, trialRequestNotifyEmail } from '#lib/server/email/templates/trial';
 export { transactionalFallbackEmail } from '#lib/server/email/templates/transactional';
 
 function str(payload: Record<string, unknown>, key: string): string | undefined {
@@ -141,6 +145,32 @@ export function resolveEmailTemplate(
 			return passwordChangedEmail({
 				loginUrl,
 				changedAtLabel: str(payload, 'changedAtLabel')
+			});
+		}
+		case 'trial_otp': {
+			const code = str(payload, 'code');
+			if (!code) return null;
+			return trialOtpEmail({
+				code,
+				expiresInMinutes: num(payload, 'expiresInMinutes')
+			});
+		}
+		case 'trial_request_notify': {
+			const firstName = str(payload, 'firstName');
+			const lastName = str(payload, 'lastName');
+			const businessName = str(payload, 'businessName');
+			const email = str(payload, 'email');
+			const duration = str(payload, 'duration');
+			if (!firstName || !lastName || !businessName || !email || !duration) return null;
+			return trialRequestNotifyEmail({
+				firstName,
+				lastName,
+				businessName,
+				businessWebsite: str(payload, 'businessWebsite'),
+				email,
+				message: str(payload, 'message'),
+				duration,
+				adminUrl: str(payload, 'adminUrl')
 			});
 		}
 		case 'ticket_issued': {
@@ -232,13 +262,13 @@ export function resolveEmailTemplate(
 		}
 		case 'transactional':
 		default: {
-			const subject = str(payload, 'subject') ?? `Loomline: ${key}`;
+			const subject = str(payload, 'subject') ?? `NextUp: ${key}`;
 			const body =
 				str(payload, 'body') ??
 				(Array.isArray(payload.bodyLines)
 					? (payload.bodyLines as unknown[]).filter((l) => typeof l === 'string').join('\n')
 					: undefined) ??
-				`Loomline notification (${key}).`;
+				`NextUp notification (${key}).`;
 			const ctaUrl = str(payload, 'ctaUrl');
 			const ctaLabel = str(payload, 'ctaLabel');
 			return transactionalFallbackEmail({

@@ -7,7 +7,7 @@ import {
 	SMTP_PORT,
 	SMTP_USER
 } from '$app/env/private';
-import { managerInviteEmail } from '#lib/server/email/templates/invite';
+import { managerInviteEmail, teamInviteEmail } from '#lib/server/email/templates/invite';
 
 export type SendEmailInput = {
 	to: string;
@@ -35,7 +35,7 @@ function smtpConfig() {
 	const passRaw = SMTP_PASS ?? process.env.SMTP_PASS;
 	const pass = passRaw !== undefined && passRaw !== null ? String(passRaw) : undefined;
 	const from =
-		(SMTP_FROM ?? process.env.SMTP_FROM)?.trim() || user || 'noreply@loomline.local';
+		(SMTP_FROM ?? process.env.SMTP_FROM)?.trim() || user || 'noreply@nextup.local';
 	return { host, port, user, pass, from };
 }
 
@@ -45,7 +45,7 @@ function encodeSubject(subject: string): string {
 }
 
 function buildMime(from: string, input: SendEmailInput): string {
-	const boundary = `loomline_${Date.now().toString(36)}`;
+	const boundary = `nextup_${Date.now().toString(36)}`;
 	const parts = [
 		`From: ${from}`,
 		`To: ${input.to}`,
@@ -213,7 +213,7 @@ async function sendViaSmtp(
 		session = new SmtpSession(initial);
 		await session.expect(220);
 
-		const hello = 'loomline.local';
+		const hello = 'nextup.local';
 		await session.expect(250, `EHLO ${hello}`);
 
 		if (!useImplicitTls && cfg.port === 587) {
@@ -274,8 +274,10 @@ export function normalizeInviteToken(raw: string | null | undefined): string {
 	return token;
 }
 
-export function inviteSetPasswordUrl(origin: string, token: string): string {
-	const base = origin.trim().replace(/\/$/, '');
+export function inviteSetPasswordUrl(origin: string | null | undefined, token: string): string {
+	const base = (origin ?? process.env.ORIGIN ?? 'http://localhost:4001')
+		.trim()
+		.replace(/\/$/, '');
 	const clean = normalizeInviteToken(token);
 	return `${base}/auth/accept-invite?token=${encodeURIComponent(clean)}`;
 }
@@ -292,4 +294,44 @@ export async function sendManagerInviteEmail(opts: {
 		roleLabel: opts.roleLabel
 	});
 	return sendEmail({ to: opts.to, ...message });
+}
+
+export async function sendTeamInviteEmail(opts: {
+	to: string;
+	businessName: string;
+	inviteUrl: string;
+	roleLabel?: string;
+}): Promise<SendEmailResult> {
+	const message = teamInviteEmail({
+		businessName: opts.businessName,
+		inviteUrl: opts.inviteUrl,
+		roleLabel: opts.roleLabel
+	});
+	return sendEmail({ to: opts.to, ...message });
+}
+
+/** User-facing invite mail outcome for CRUD toasts. */
+export function inviteMailToast(
+	email: string,
+	result: SendEmailResult,
+	verb: 'sent' | 'resent' = 'sent'
+): { success: boolean; message: string } {
+	if (result.ok && result.loggedOnly) {
+		return {
+			success: true,
+			message: `Invite ${verb === 'resent' ? 'resent' : 'queued'} for ${email} (link logged on server; set SMTP_* to email it).`
+		};
+	}
+	if (result.ok) {
+		return {
+			success: true,
+			message: verb === 'resent' ? `Invite resent to ${email}.` : `Invite sent to ${email}.`
+		};
+	}
+	const detail = result.errorMessage ? ` ${result.errorMessage}` : '';
+	console.error(`[email:invite] failed to=${email}:${detail}`);
+	return {
+		success: false,
+		message: `Invite saved for ${email}, but email failed.${detail} Check SMTP_* and resend.`
+	};
 }

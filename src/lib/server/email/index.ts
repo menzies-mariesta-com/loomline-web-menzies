@@ -17,6 +17,8 @@ export {
 	welcomeAfterAcceptEmail,
 	passwordResetEmail,
 	passwordChangedEmail,
+	trialOtpEmail,
+	trialRequestNotifyEmail,
 	ticketIssuedEmail,
 	ticketCalledEmail,
 	almostYourTurnEmail,

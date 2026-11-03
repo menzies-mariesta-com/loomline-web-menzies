@@ -15,9 +15,9 @@ if (!databaseUrl) {
 	process.exit(1);
 }
 
-const email = process.env.SEED_PLATFORM_ADMIN_EMAIL ?? 'admin@loomline.local';
-const password = process.env.SEED_PLATFORM_ADMIN_PASSWORD ?? 'LoomlineAdmin1!';
-const name = process.env.SEED_PLATFORM_ADMIN_NAME ?? 'Loomline Admin';
+const email = process.env.SEED_PLATFORM_ADMIN_EMAIL ?? 'admin@nextup.local';
+const password = process.env.SEED_PLATFORM_ADMIN_PASSWORD ?? 'NextUpAdmin1!';
+const name = process.env.SEED_PLATFORM_ADMIN_NAME ?? 'NextUp Admin';
 
 const client = neon(databaseUrl);
 const db = drizzle(client, { schema });

@@ -1,4 +1,5 @@
 import { emailAssetUrl, emailBrand, escapeAttr, escapeHtml, siteOrigin } from '#lib/server/email/brand';
+import { MENZIES_WEBSITE_URL, menziesEmailLinkHtml } from '#lib/constant/menzies';
 import type { EmailCta } from '#lib/server/email/templates/types';
 
 export type EmailLayoutOptions = {
@@ -12,7 +13,7 @@ export type EmailLayoutOptions = {
 	cta?: EmailCta;
 	/** Soft Wash queue hero illustration under the header. Default true. */
 	showHero?: boolean;
-	/** Footer company line override. */
+	/** Footer company line override (plain text only). */
 	companyLine?: string;
 };
 
@@ -27,13 +28,17 @@ export function renderEmailLayout(opts: EmailLayoutOptions): string {
 		bodyHtml,
 		cta,
 		showHero = true,
-		companyLine = 'Loomline by MARIESTA. Queue and appointment operations.'
+		companyLine = 'NextUp by Menzies. Queue and appointment operations.'
 	} = opts;
 
 	const origin = siteOrigin();
 	const heroUrl = emailAssetUrl('/email/hero-queue.svg');
 	const logoUrl = emailAssetUrl('/favicon-32.png');
 	const { mint, mintDeep, ink, teal, navy, cream, white } = emailBrand;
+
+	const companyLineHtml = companyLine.includes('<a ')
+		? companyLine
+		: escapeHtml(companyLine).replace('Menzies', menziesEmailLinkHtml(navy));
 
 	const ctaBlock = cta
 		? `<tr>
@@ -61,7 +66,7 @@ export function renderEmailLayout(opts: EmailLayoutOptions): string {
 	const heroBlock = showHero
 		? `<tr>
 				<td style="padding:0 28px 8px;">
-					<img src="${escapeAttr(heroUrl)}" width="504" alt="Loomline queue illustration" style="display:block;width:100%;max-width:504px;height:auto;border:0;border-radius:12px;" />
+					<img src="${escapeAttr(heroUrl)}" width="504" alt="NextUp queue illustration" style="display:block;width:100%;max-width:504px;height:auto;border:0;border-radius:12px;" />
 				</td>
 			</tr>`
 		: '';
@@ -105,7 +110,7 @@ ${preheader ? `<div style="display:none;font-size:1px;line-height:1px;max-height
 									<img src="${escapeAttr(logoUrl)}" width="28" height="28" alt="" style="display:block;border:0;border-radius:6px;" />
 								</td>
 								<td valign="middle" style="padding-left:10px;font-family:Fraunces,Georgia,serif;font-size:22px;font-weight:600;letter-spacing:-0.02em;color:${ink};">
-									<a href="${escapeAttr(origin)}" style="color:${ink};text-decoration:none;">Loomline</a>
+									<a href="${escapeAttr(origin)}" style="color:${ink};text-decoration:none;">NextUp</a>
 								</td>
 							</tr>
 						</table>
@@ -135,7 +140,7 @@ ${preheader ? `<div style="display:none;font-size:1px;line-height:1px;max-height
 					<td class="email-pad" align="center" style="padding:0 28px 24px;font-family:Outfit,Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:${navy};">
 						<a href="${escapeAttr(origin)}" style="color:${teal};text-decoration:none;font-weight:500;">${escapeHtml(origin.replace(/^https?:\/\//, ''))}</a>
 						<br />
-						<span style="color:${navy};opacity:0.85;">${escapeHtml(companyLine)}</span>
+						<span style="color:${navy};opacity:0.85;">${companyLineHtml}</span>
 					</td>
 				</tr>
 			</table>
@@ -149,5 +154,5 @@ ${preheader ? `<div style="display:none;font-size:1px;line-height:1px;max-height
 /** Plain-text footer shared across scenarios. */
 export function textFooter(): string {
 	const origin = siteOrigin();
-	return `\n\n---\nLoomline\n${origin}\nLoomline by MARIESTA. Queue and appointment operations.`;
+	return `\n\n---\nNextUp\n${origin}\nNextUp by Menzies (${MENZIES_WEBSITE_URL}). Queue and appointment operations.`;
 }

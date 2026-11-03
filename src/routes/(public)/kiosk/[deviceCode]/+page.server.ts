@@ -33,7 +33,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		where: eq(business.id, device.businessId)
 	});
 
-	return { device, queues, businessName: biz?.name ?? 'Loomline' };
+	return { device, queues, businessName: biz?.name ?? 'NextUp' };
 };
 
 export const actions: Actions = {

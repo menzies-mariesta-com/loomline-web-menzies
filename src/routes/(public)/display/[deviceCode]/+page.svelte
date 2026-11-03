@@ -23,8 +23,11 @@
 	};
 
 	let { data } = $props();
-	// Overridable derived: seeds from load data, SSE/poll can reassign.
-	let snapshot = $derived(data.snapshot as DisplaySnapshot);
+	let snapshot = $state(data.snapshot as DisplaySnapshot);
+
+	$effect(() => {
+		snapshot = data.snapshot as DisplaySnapshot;
+	});
 	let lastAnnounced = $state('');
 	let isFullscreen = $state(false);
 	let reducedMotion = $state(false);
@@ -320,6 +323,16 @@
 	 translucent gradients wash dark over that backdrop.
 	*/
 	.loom-display {
+		/*
+		 TV board is always a light Soft Wash surface. Pin marketing tokens so a
+		 site-wide *-dark pigment does not flip ticket numbers to light-on-light.
+		 */
+		--loom-ink: #1c2a28;
+		--loom-teal: #3d7a6f;
+		--loom-mint: #d8eee6;
+		--loom-mint-deep: #b8ddd0;
+		--loom-coral: #e07a5f;
+		--loom-navy: #2c3e50;
 		--loom-board-bg: color-mix(in oklab, var(--loom-mint) 28%, #f7f4ef);
 		background-color: var(--loom-board-bg);
 		background-image:
@@ -334,6 +347,7 @@
 				transparent 50%
 			);
 		background-repeat: no-repeat;
+		color: var(--loom-ink);
 		color-scheme: light;
 	}
 

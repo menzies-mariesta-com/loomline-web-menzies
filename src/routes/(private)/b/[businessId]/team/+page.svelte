@@ -4,6 +4,7 @@
 	import {
 		CircleCheck,
 		CircleX,
+		Mail,
 		MailPlus,
 		RefreshCw,
 		UserPlus,
@@ -14,6 +15,9 @@
 	import { shortDateTime } from '#lib/util/format';
 	import DataTableShell from '#lib/component/own/local/private/data-table/DataTableShell.svelte';
 	import SearchSelect from '#lib/component/own/local/private/SearchSelect.svelte';
+	import ToastDismissButton from '#lib/component/own/local/private/ToastDismissButton.svelte';
+	import IconActionTip from '#lib/component/wash/tooltip/IconActionTip.svelte';
+	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
 
 	let { data, form } = $props();
 
@@ -54,6 +58,7 @@
 	let inviting = $state(false);
 	let provisioning = $state(false);
 	let refreshing = $state(false);
+	let busyInviteId = $state<string | null>(null);
 	let bodyEl = $state<HTMLDivElement | null>(null);
 	let page = $state(1);
 	let pageSizeChoice = $state('auto');
@@ -315,11 +320,7 @@
 				<CircleX class="h-5 w-5 shrink-0" aria-hidden="true" />
 			{/if}
 			<span>{form.message}</span>
-			<button
-				type="button"
-				class="btn btn-ghost btn-xs cursor-pointer"
-				onclick={() => (toastGone = true)}>Dismiss</button
-			>
+			<ToastDismissButton onclick={() => (toastGone = true)} />
 		</div>
 	</div>
 {/if}
@@ -365,8 +366,8 @@
 		footerSummary={footerSummary}
 	>
 		{#snippet headerActions()}
-			<div class="tooltip tooltip-bottom tooltip-secondary" data-tip="Refresh">
-				<button
+			<WashTooltip tooltipText="Refresh" className="tooltip-secondary">
+<button
 					type="button"
 					class="btn btn-ghost btn-square btn-sm btn-secondary"
 					class:cursor-pointer={!refreshing}
@@ -382,9 +383,9 @@
 						<RefreshCw class="size-4" aria-hidden="true" />
 					{/if}
 				</button>
-			</div>
-			<div class="tooltip tooltip-left tooltip-primary" data-tip="Invite">
-				<button
+</WashTooltip>
+			<WashTooltip tooltipText="Invite" className="tooltip-primary">
+<button
 					type="button"
 					class="btn btn-ghost btn-square btn-sm btn-primary cursor-pointer"
 					aria-label="Invite"
@@ -392,7 +393,7 @@
 				>
 					<UserPlus class="size-4" aria-hidden="true" />
 				</button>
-			</div>
+</WashTooltip>
 		{/snippet}
 
 		{#if listView === 'members'}
@@ -594,15 +595,47 @@
 							<tr>
 								<td>
 									{#if inv.status === 'pending'}
-										<div class="tooltip tooltip-secondary tooltip-right" data-tip="Provision">
-											<button
-												type="button"
-												class="btn btn-ghost btn-square btn-xs btn-secondary cursor-pointer"
-												aria-label="Provision"
-												onclick={() => openProvision(inv)}
+										<div class="flex items-center gap-0.5">
+											<form
+												method="POST"
+												action="?/resendInvite"
+												use:enhance={bindSubmitting(
+													(v) => (busyInviteId = v ? inv.id : null),
+													async ({ update }) => {
+														await update();
+													}
+												)}
 											>
-												<UserPlus class="size-3.5" aria-hidden="true" />
-											</button>
+												<input type="hidden" name="inviteId" value={inv.id} />
+												<IconActionTip tip="Resend set-password email" tone="secondary">
+<button
+														type="submit"
+														class="btn btn-ghost btn-square btn-xs btn-secondary"
+														class:cursor-pointer={busyInviteId !== inv.id}
+														class:cursor-not-allowed={busyInviteId === inv.id}
+														class:loading={busyInviteId === inv.id}
+														disabled={busyInviteId === inv.id}
+														aria-busy={busyInviteId === inv.id}
+														aria-label="Resend set-password email"
+													>
+														{#if busyInviteId !== inv.id}
+															<Mail class="size-3.5" aria-hidden="true" />
+														{/if}
+													</button>
+												</IconActionTip>
+
+											</form>
+											<IconActionTip tip="Provision" tone="secondary">
+<button
+													type="button"
+													class="btn btn-ghost btn-square btn-xs btn-secondary cursor-pointer"
+													aria-label="Provision"
+													onclick={() => openProvision(inv)}
+												>
+													<UserPlus class="size-3.5" aria-hidden="true" />
+												</button>
+											</IconActionTip>
+
 										</div>
 									{:else}
 										<span class="text-ink-muted text-xs">-</span>
@@ -693,7 +726,7 @@
 	<div class="modal-box w-11/12 border-base-300 max-w-lg border bg-base-100 shadow-sm">
 		<h2 class="card-title text-primary font-bold">Invite teammate</h2>
 		<p class="text-ink-muted mt-1 text-sm">
-			We email a join link. They set a password and appear under Members once accepted.
+			We email a set-password link. They set a password and appear under Members once accepted.
 		</p>
 		<form
 			method="POST"
@@ -701,7 +734,15 @@
 			class="mt-4 flex flex-col gap-3"
 			use:enhance={bindSubmitting((v) => (inviting = v), async ({ result, update }) => {
 				await update();
-				if (result.type === 'success') closeInvite();
+				if (
+					result.type === 'success' &&
+					result.data &&
+					typeof result.data === 'object' &&
+					'success' in result.data &&
+					result.data.success
+				) {
+					closeInvite();
+				}
 			})}
 		>
 			<label class="form-control flex w-full flex-col" for="team-invite-email">

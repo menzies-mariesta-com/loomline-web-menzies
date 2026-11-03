@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
+	import { onMount } from 'svelte';
 	import {
 		Ban,
 		CircleCheck,
@@ -18,9 +19,22 @@
 	} from '@lucide/svelte';
 	import { washRecipes } from '@menzies-mariesta-com/menzies-design-wash-ui/core';
 	import { bindSubmitting } from '#lib/tool/form-submit';
+	import {
+		agentActionHint,
+		canCallTicket,
+		canCompleteTicket,
+		canHoldTicket,
+		canMarkNoShow,
+		canRecallTicket,
+		canStartServing,
+		isTerminalTicketStatus
+	} from '#lib/tool/ticket-status';
 	import { shortDateTime } from '#lib/util/format';
 	import DataTableShell from '#lib/component/own/local/private/data-table/DataTableShell.svelte';
 	import SearchSelect from '#lib/component/own/local/private/SearchSelect.svelte';
+	import ToastDismissButton from '#lib/component/own/local/private/ToastDismissButton.svelte';
+	import IconActionTip from '#lib/component/wash/tooltip/IconActionTip.svelte';
+	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
 
 	let { data, form } = $props();
 
@@ -112,6 +126,17 @@
 			Math.max(0, safePage - 3) + 5
 		)
 	);
+
+	const showFloorHint = $derived(
+		data.tickets.length === 0 && !numberFilter.trim() && !statusFilter
+	);
+
+	onMount(() => {
+		const id = setInterval(() => {
+			if (document.visibilityState === 'visible') void invalidateAll();
+		}, 4000);
+		return () => clearInterval(id);
+	});
 
 	$effect(() => {
 		if (!selectedQueue && data.queues[0]) selectedQueue = data.queues[0].id;
@@ -205,18 +230,25 @@
 				<CircleX class="h-5 w-5 shrink-0" aria-hidden="true" />
 			{/if}
 			<span>{form.message}</span>
-			<button
-				type="button"
-				class="btn btn-ghost btn-xs cursor-pointer"
-				onclick={() => (toastGone = true)}>Dismiss</button
-			>
+			<ToastDismissButton onclick={() => (toastGone = true)} />
 		</div>
 	</div>
 {/if}
 
 <div class="flex min-h-0 flex-1 flex-col gap-3">
+	{#if showFloorHint}
+		<div class="alert alert-info shadow-sm">
+			<span class="text-sm">
+				Site, queue, and counter setup does not create tickets or open the TV. Add a
+				<strong>TV</strong> and <strong>kiosk</strong> under Devices, issue a ticket (kiosk or
+				<strong>Issue ticket</strong> here), pick queue + counter, then
+				<strong>Call next</strong>. The TV shows numbers in <strong>Upcoming</strong> while waiting and
+				<strong>Now serving</strong> after you call.
+			</span>
+		</div>
+	{/if}
 	<div
-		class="border-base-300 rounded-box flex shrink-0 flex-wrap items-end gap-2 border bg-base-100 p-3 shadow-sm"
+		class="border-base-300 rounded-box flex shrink-0 flex-wrap items-end gap-2 overflow-visible border bg-base-100 p-3 shadow-sm"
 	>
 		<div class="min-w-[10rem] max-w-xs flex-1">
 			<label class="label py-0 pb-1" for="agent-queue">
@@ -267,7 +299,7 @@
 		</button>
 	</div>
 
-	<div class="grid min-h-0 flex-1 gap-3 lg:grid-cols-[1fr_18rem]">
+	<div class="relative z-0 grid min-h-0 flex-1 gap-3 lg:grid-cols-[1fr_18rem]">
 		<div class="flex min-h-0 min-w-0 flex-1 flex-col">
 			<DataTableShell
 				title="Agent console"
@@ -278,8 +310,8 @@
 				footerSummary={footerSummary}
 			>
 				{#snippet headerActions()}
-					<div class="tooltip tooltip-bottom tooltip-secondary" data-tip="Refresh">
-						<button
+					<WashTooltip tooltipText="Refresh" className="tooltip-secondary">
+<button
 							type="button"
 							class="btn btn-ghost btn-square btn-sm btn-secondary"
 							class:cursor-pointer={!refreshing}
@@ -295,9 +327,9 @@
 								<RefreshCw class="size-4" aria-hidden="true" />
 							{/if}
 						</button>
-					</div>
-					<div class="tooltip tooltip-left tooltip-primary" data-tip="Issue ticket">
-						<button
+</WashTooltip>
+					<WashTooltip tooltipText="Issue ticket" className="tooltip-primary">
+<button
 							type="button"
 							class="btn btn-ghost btn-square btn-sm btn-primary cursor-pointer"
 							aria-label="Issue ticket"
@@ -305,7 +337,7 @@
 						>
 							<Plus class="size-4" aria-hidden="true" />
 						</button>
-					</div>
+</WashTooltip>
 				{/snippet}
 
 				<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
@@ -353,7 +385,11 @@
 						{#if pageRows.length === 0}
 							<tr>
 								<td colspan="7" class="text-ink-muted py-10 text-center text-sm">
-									No tickets match these filters.
+									{#if showFloorHint}
+										No tickets yet — issue one from the kiosk or use Issue ticket above.
+									{:else}
+										No tickets match these filters.
+									{/if}
 								</td>
 							</tr>
 						{:else}
@@ -364,28 +400,57 @@
 								>
 									<td onclick={(e) => e.stopPropagation()}>
 										<div class="flex flex-wrap items-center gap-0.5">
+											{#if canCallTicket(t.status)}
+												<form
+													method="POST"
+													action="?/callTicket"
+													use:enhance={bindSubmitting((v) => (busy = v))}
+												>
+													<input type="hidden" name="ticketId" value={t.id} />
+													<input type="hidden" name="counterId" value={selectedCounter} />
+													<IconActionTip tip="Call this ticket" tone="primary">
+<button
+															type="submit"
+															class="btn btn-ghost btn-square btn-xs btn-primary"
+															class:loading={busy}
+															disabled={busy || !selectedCounter}
+															aria-busy={busy}
+															aria-label="Call ticket"
+															class:cursor-pointer={!busy && !!selectedCounter}
+															class:cursor-not-allowed={busy || !selectedCounter}
+														>
+															{#if !busy}
+																<PhoneForwarded class="size-3.5" aria-hidden="true" />
+															{/if}
+														</button>
+													</IconActionTip>
+												</form>
+											{/if}
 											<form
 												method="POST"
 												action="?/recall"
 												use:enhance={bindSubmitting((v) => (busy = v))}
 											>
 												<input type="hidden" name="ticketId" value={t.id} />
-												<div class="tooltip tooltip-secondary tooltip-right" data-tip="Recall">
-													<button
+												<IconActionTip
+													tip={agentActionHint(t.status, 'recall') ?? 'Recall'}
+													tone="secondary"
+												>
+<button
 														type="submit"
 														class="btn btn-ghost btn-square btn-xs btn-secondary"
 														class:loading={busy}
-														disabled={busy}
+														disabled={busy || !canRecallTicket(t.status)}
 														aria-busy={busy}
 														aria-label="Recall"
-														class:cursor-pointer={!busy}
-														class:cursor-not-allowed={busy}
+														class:cursor-pointer={!busy && canRecallTicket(t.status)}
+														class:cursor-not-allowed={busy || !canRecallTicket(t.status)}
 													>
 														{#if !busy}
 															<Megaphone class="size-3.5" aria-hidden="true" />
 														{/if}
 													</button>
-												</div>
+												</IconActionTip>
 											</form>
 											<form
 												method="POST"
@@ -393,22 +458,25 @@
 												use:enhance={bindSubmitting((v) => (busy = v))}
 											>
 												<input type="hidden" name="ticketId" value={t.id} />
-												<div class="tooltip tooltip-primary tooltip-right" data-tip="Serve">
-													<button
+												<IconActionTip
+													tip={agentActionHint(t.status, 'serve') ?? 'Start serving'}
+													tone="primary"
+												>
+<button
 														type="submit"
 														class="btn btn-ghost btn-square btn-xs btn-primary"
 														class:loading={busy}
-														disabled={busy}
+														disabled={busy || !canStartServing(t.status)}
 														aria-busy={busy}
 														aria-label="Serve"
-														class:cursor-pointer={!busy}
-														class:cursor-not-allowed={busy}
+														class:cursor-pointer={!busy && canStartServing(t.status)}
+														class:cursor-not-allowed={busy || !canStartServing(t.status)}
 													>
 														{#if !busy}
 															<CirclePlay class="size-3.5" aria-hidden="true" />
 														{/if}
 													</button>
-												</div>
+												</IconActionTip>
 											</form>
 											<form
 												method="POST"
@@ -416,22 +484,25 @@
 												use:enhance={bindSubmitting((v) => (busy = v))}
 											>
 												<input type="hidden" name="ticketId" value={t.id} />
-												<div class="tooltip tooltip-success tooltip-right" data-tip="Done">
-													<button
+												<IconActionTip
+													tip={agentActionHint(t.status, 'complete') ?? 'Done'}
+													tone="success"
+												>
+<button
 														type="submit"
 														class="btn btn-ghost btn-square btn-xs btn-success"
 														class:loading={busy}
-														disabled={busy}
+														disabled={busy || !canCompleteTicket(t.status)}
 														aria-busy={busy}
 														aria-label="Done"
-														class:cursor-pointer={!busy}
-														class:cursor-not-allowed={busy}
+														class:cursor-pointer={!busy && canCompleteTicket(t.status)}
+														class:cursor-not-allowed={busy || !canCompleteTicket(t.status)}
 													>
 														{#if !busy}
 															<CircleCheck class="size-3.5" aria-hidden="true" />
 														{/if}
 													</button>
-												</div>
+												</IconActionTip>
 											</form>
 											<form
 												method="POST"
@@ -439,22 +510,22 @@
 												use:enhance={bindSubmitting((v) => (busy = v))}
 											>
 												<input type="hidden" name="ticketId" value={t.id} />
-												<div class="tooltip tooltip-error tooltip-right" data-tip="No-show">
-													<button
+												<IconActionTip tip="No-show" tone="error">
+<button
 														type="submit"
 														class="btn btn-ghost btn-square btn-xs btn-error"
 														class:loading={busy}
-														disabled={busy}
+														disabled={busy || !canMarkNoShow(t.status)}
 														aria-busy={busy}
 														aria-label="No-show"
-														class:cursor-pointer={!busy}
-														class:cursor-not-allowed={busy}
+														class:cursor-pointer={!busy && canMarkNoShow(t.status)}
+														class:cursor-not-allowed={busy || !canMarkNoShow(t.status)}
 													>
 														{#if !busy}
 															<Ban class="size-3.5" aria-hidden="true" />
 														{/if}
 													</button>
-												</div>
+												</IconActionTip>
 											</form>
 											<form
 												method="POST"
@@ -462,25 +533,26 @@
 												use:enhance={bindSubmitting((v) => (busy = v))}
 											>
 												<input type="hidden" name="ticketId" value={t.id} />
-												<div class="tooltip tooltip-warning tooltip-right" data-tip="Hold">
-													<button
+												<IconActionTip tip="Hold" tone="warning">
+<button
 														type="submit"
 														class="btn btn-ghost btn-square btn-xs btn-warning"
 														class:loading={busy}
-														disabled={busy}
+														disabled={busy || !canHoldTicket(t.status)}
 														aria-busy={busy}
 														aria-label="Hold"
-														class:cursor-pointer={!busy}
-														class:cursor-not-allowed={busy}
+														class:cursor-pointer={!busy && canHoldTicket(t.status)}
+														class:cursor-not-allowed={busy || !canHoldTicket(t.status)}
 													>
 														{#if !busy}
 															<Pause class="size-3.5" aria-hidden="true" />
 														{/if}
 													</button>
-												</div>
+												</IconActionTip>
 											</form>
-											<div class="tooltip tooltip-warning tooltip-right" data-tip="Transfer">
-												<button
+											{#if !isTerminalTicketStatus(t.status)}
+											<IconActionTip tip="Transfer" tone="warning">
+<button
 													type="button"
 													class="btn btn-ghost btn-square btn-xs btn-warning cursor-pointer"
 													aria-label="Transfer"
@@ -488,10 +560,11 @@
 												>
 													<ArrowRightLeft class="size-3.5" aria-hidden="true" />
 												</button>
-											</div>
+											</IconActionTip>
+
 											{#if data.destinations.length > 0}
-												<div class="tooltip tooltip-accent tooltip-right" data-tip="Redirect">
-													<button
+												<IconActionTip tip="Redirect" tone="accent">
+<button
 														type="button"
 														class="btn btn-ghost btn-square btn-xs btn-accent cursor-pointer"
 														aria-label="Redirect"
@@ -499,7 +572,9 @@
 													>
 														<CornerDownRight class="size-3.5" aria-hidden="true" />
 													</button>
-												</div>
+												</IconActionTip>
+
+											{/if}
 											{/if}
 											<form
 												method="POST"
@@ -517,8 +592,8 @@
 												})}
 											>
 												<input type="hidden" name="ticketId" value={t.id} />
-												<div class="tooltip tooltip-info tooltip-right" data-tip="Timeline">
-													<button
+												<IconActionTip tip="Timeline" tone="info">
+<button
 														type="submit"
 														class="btn btn-ghost btn-square btn-xs btn-info"
 														class:loading={busy}
@@ -532,7 +607,8 @@
 															<History class="size-3.5" aria-hidden="true" />
 														{/if}
 													</button>
-												</div>
+												</IconActionTip>
+
 											</form>
 										</div>
 									</td>

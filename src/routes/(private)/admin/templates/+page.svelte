@@ -8,6 +8,9 @@
 	import DataTableShell from '#lib/component/own/local/private/data-table/DataTableShell.svelte';
 	import DateRangeFilter from '#lib/component/own/local/private/data-table/DateRangeFilter.svelte';
 	import SearchSelect from '#lib/component/own/local/private/SearchSelect.svelte';
+	import ToastDismissButton from '#lib/component/own/local/private/ToastDismissButton.svelte';
+	import IconActionTip from '#lib/component/wash/tooltip/IconActionTip.svelte';
+	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
 
 	type TemplateRow = {
 		id: string;
@@ -149,7 +152,7 @@
 </script>
 
 <svelte:head>
-	<title>Templates | Loomline Admin</title>
+	<title>Templates | NextUp Admin</title>
 	<meta name="robots" content="noindex,nofollow" />
 </svelte:head>
 
@@ -167,19 +170,15 @@
 					<CircleX class="h-5 w-5 shrink-0" aria-hidden="true" />
 				{/if}
 				<span>{form.message}</span>
-				<button
-					type="button"
-					class="btn btn-ghost btn-xs cursor-pointer"
-					onclick={() => (toastGone = true)}>Dismiss</button
-				>
+				<ToastDismissButton onclick={() => (toastGone = true)} />
 			</div>
 		</div>
 	{/if}
 
 	<DataTableShell title="Templates" bind:bodyEl footerSummary={footerSummary}>
 		{#snippet headerActions()}
-			<div class="tooltip tooltip-bottom tooltip-secondary" data-tip="Refresh">
-				<button
+			<WashTooltip tooltipText="Refresh" className="tooltip-secondary">
+<button
 					type="button"
 					class="btn btn-ghost btn-square btn-sm btn-secondary"
 					class:cursor-pointer={!refreshing}
@@ -195,9 +194,9 @@
 						<RefreshCw class="size-4" aria-hidden="true" />
 					{/if}
 				</button>
-			</div>
-			<div class="tooltip tooltip-left tooltip-primary" data-tip="Add">
-				<button
+</WashTooltip>
+			<WashTooltip tooltipText="Add" className="tooltip-primary">
+<button
 					type="button"
 					class="btn btn-ghost btn-square btn-sm btn-primary cursor-pointer"
 					aria-label="Add"
@@ -205,7 +204,7 @@
 				>
 					<Plus class="size-4" aria-hidden="true" />
 				</button>
-			</div>
+</WashTooltip>
 		{/snippet}
 
 		<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
@@ -260,8 +259,8 @@
 					{#each pageRows as t, i (t.id)}
 						<tr>
 							<td>
-								<div class="tooltip tooltip-secondary tooltip-right" data-tip="Edit">
-									<button
+								<IconActionTip tip="Edit" tone="secondary">
+<button
 										type="button"
 										class="btn btn-ghost btn-square btn-xs btn-secondary cursor-pointer"
 										aria-label="Edit"
@@ -269,7 +268,8 @@
 									>
 										<Pencil class="size-3.5" aria-hidden="true" />
 									</button>
-								</div>
+								</IconActionTip>
+
 							</td>
 							<td>{(safePage - 1) * pageSize + i + 1}</td>
 							<td>

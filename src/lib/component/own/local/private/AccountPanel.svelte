@@ -13,6 +13,7 @@
 	} from '@lucide/svelte';
 	import { washRecipes } from '@menzies-mariesta-com/menzies-design-wash-ui/core';
 	import PageHeader from '#lib/component/own/local/private/PageHeader.svelte';
+	import ToastDismissButton from '#lib/component/own/local/private/ToastDismissButton.svelte';
 	import { bindSubmitting } from '#lib/tool/form-submit';
 	import { shortDateTime } from '#lib/util/format';
 	import { m } from '#lib/paraglide/messages';
@@ -93,11 +94,7 @@
 				<CircleX class="h-5 w-5 shrink-0" aria-hidden="true" />
 			{/if}
 			<span>{form.message}</span>
-			<button
-				type="button"
-				class="btn btn-ghost btn-xs cursor-pointer"
-				onclick={() => (dismissedMessage = form.message ?? null)}>{m.common_dismiss()}</button
-			>
+			<ToastDismissButton onclick={() => (dismissedMessage = form.message ?? null)} />
 		</div>
 	</div>
 {/if}

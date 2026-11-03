@@ -2,7 +2,9 @@
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import { Eye, EyeOff } from '@lucide/svelte';
+	import appIcon from '#lib/asset/image/app-icon-ticket.svg';
 	import { m } from '#lib/paraglide/messages';
+	import MenziesLink from '#lib/component/own/local/public/MenziesLink.svelte';
 	import { bindSubmitting } from '#lib/tool/form-submit';
 
 	let { data, form } = $props();
@@ -27,12 +29,16 @@
 	>
 		<div class="max-w-md text-center lg:text-left">
 			<p class="label-ink mb-2">
-				<a
-					class="font-[family-name:var(--font-display)] text-primary cursor-pointer text-lg font-semibold tracking-tight whitespace-nowrap"
-					href={resolve('/')}
+				<span
+					class="font-[family-name:var(--font-display)] text-primary inline-flex cursor-pointer items-center justify-center gap-2 text-lg font-semibold tracking-tight whitespace-nowrap lg:justify-start"
 				>
-					{m.brand_menzies_mariesta()}
-				</a>
+					<a href={resolve('/')} class="inline-flex shrink-0">
+						<img src={appIcon} alt="" width="28" height="28" class="size-7 shrink-0" aria-hidden="true" />
+					</a>
+					<MenziesLink
+						class="font-[family-name:var(--font-display)] text-primary text-lg font-semibold tracking-tight"
+					/>
+				</span>
 			</p>
 			<h1 class="font-display text-3xl font-bold md:text-4xl">{m.auth_login_welcome()}</h1>
 			<p class="text-ink-muted py-4 text-sm md:text-base">

@@ -6,6 +6,8 @@
 	import { shortDateTime } from '#lib/util/format';
 	import DataTableShell from '#lib/component/own/local/private/data-table/DataTableShell.svelte';
 	import SearchSelect from '#lib/component/own/local/private/SearchSelect.svelte';
+	import IconActionTip from '#lib/component/wash/tooltip/IconActionTip.svelte';
+	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
 
 	let { data } = $props();
 
@@ -118,8 +120,8 @@
 		footerSummary={footerSummary}
 	>
 		{#snippet headerActions()}
-			<div class="tooltip tooltip-bottom tooltip-secondary" data-tip="Refresh">
-				<button
+			<WashTooltip tooltipText="Refresh" className="tooltip-secondary">
+<button
 					type="button"
 					class="btn btn-ghost btn-square btn-sm btn-secondary"
 					class:cursor-pointer={!refreshing}
@@ -135,7 +137,7 @@
 						<RefreshCw class="size-4" aria-hidden="true" />
 					{/if}
 				</button>
-			</div>
+</WashTooltip>
 		{/snippet}
 
 		<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
@@ -205,8 +207,8 @@
 						<tr>
 							<td>
 								<div class="flex items-center gap-0.5">
-									<div class="tooltip tooltip-primary tooltip-right" data-tip="Open guest view">
-										<a
+									<IconActionTip tip="Open guest view" tone="primary">
+<a
 											class="btn btn-ghost btn-square btn-xs btn-primary cursor-pointer"
 											href={resolve(`/t/${t.publicToken}`)}
 											target="_blank"
@@ -215,7 +217,8 @@
 										>
 											<ExternalLink class="size-3.5" aria-hidden="true" />
 										</a>
-									</div>
+									</IconActionTip>
+
 								</div>
 							</td>
 							<td>{(safePage - 1) * pageSize + i + 1}</td>

@@ -7,9 +7,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const memberships = await getMembershipsForUser(user.id);
 	const platformAdmin = await isPlatformAdmin(user.id);
 
-	if (!platformAdmin && memberships.length === 1 && memberships[0].business) {
-		throw redirect(303, `/b/${memberships[0].business.id}`);
+	const usable = memberships.filter((m) => {
+		const status = m.business?.status;
+		return status === 'active' || status === 'pending';
+	});
+
+	if (!platformAdmin && usable.length === 1 && usable[0].business) {
+		throw redirect(303, `/b/${usable[0].business.id}`);
 	}
 
-	return { memberships, platformAdmin };
+	return { memberships: usable, platformAdmin };
 };

@@ -1,10 +1,33 @@
 import { paraglideVitePlugin } from '@inlang/paraglide-js';
-import { mdsvex } from 'mdsvex';
+import { mdsvex, type MdsvexOptions } from 'mdsvex';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import adapter from '@sveltejs/adapter-netlify';
 import { sveltekit } from '@sveltejs/kit/vite';
+
+/**
+ * mdsvex 0.12.x emits `<script context="module">` for frontmatter.
+ * Svelte 5 prefers `<script module>`; no stable mdsvex option yet
+ * (1.0 / PR #773). Rewrite output before the Svelte compiler runs.
+ */
+function mdsvexSvelte5(options?: MdsvexOptions) {
+	const processor = mdsvex(options);
+	return {
+		name: 'mdsvex-svelte5',
+		async markup(args: { content: string; filename?: string }) {
+			const result = await processor.markup(args);
+			if (!result?.code) return result;
+			return {
+				...result,
+				code: result.code.replace(
+					/<script(\s[^>]*?)?\scontext=(["'])module\2/g,
+					'<script$1 module'
+				)
+			};
+		}
+	};
+}
 
 export default defineConfig({
 	server: {
@@ -24,7 +47,7 @@ export default defineConfig({
 				experimental: { async: true }
 			},
 			adapter: adapter(),
-			preprocess: [mdsvex({ extensions: ['.svx', '.md'] })],
+			preprocess: [mdsvexSvelte5({ extensions: ['.svx', '.md'] })],
 			extensions: ['.svelte', '.svx', '.md'],
 			experimental: { remoteFunctions: true }
 		}),
@@ -32,7 +55,10 @@ export default defineConfig({
 		paraglideVitePlugin({
 			project: './project.inlang',
 			outdir: './src/lib/paraglide',
-			emitTsDeclarations: true
+			emitTsDeclarations: true,
+			// Cookie for SSR (hooks middleware); localStorage so the preference is
+			// visible in browser storage and survives when cookies are restricted.
+			strategy: ['cookie', 'localStorage', 'baseLocale']
 		})
 	],
 	test: {

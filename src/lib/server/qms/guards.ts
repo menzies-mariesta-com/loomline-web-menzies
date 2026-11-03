@@ -3,6 +3,7 @@ import { error, redirect } from '@sveltejs/kit';
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '#lib/server/db';
 import { business, membership, platformAdmin } from '#lib/server/db/schema';
+import { enforceTrialAccess } from '#lib/server/qms/trial-expiry';
 
 export type MembershipRole =
 	| 'platform_admin'
@@ -91,6 +92,11 @@ export async function requireBusinessRole(
 
 	if (await isPlatformAdmin(u.id)) {
 		return { user: u, business: biz, membership: null as MembershipRow | null };
+	}
+
+	const access = await enforceTrialAccess(biz.id);
+	if (!access.ok) {
+		throw error(403, access.reason ?? 'Business console is not available');
 	}
 
 	const mem = await db.query.membership.findFirst({

@@ -1,25 +1,28 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { washRecipes } from '@menzies-mariesta-com/menzies-design-wash-ui/core';
-	import favicon from '#lib/asset/image/favicon.svg';
+	import appIcon from '#lib/asset/image/app-icon-ticket.svg';
 	import {
 		readAdminSidebarMode,
 		writeAdminSidebarMode,
 		type AdminSidebarMode
 	} from '#lib/store/local-storage/admin-sidebar-mode';
+	import { bindSubmitting } from '#lib/tool/form-submit';
 	import AppearanceMenu from './AppearanceMenu.svelte';
 	import LanguageMenu from './LanguageMenu.svelte';
 	import { m } from '#lib/paraglide/messages';
 	import {
 		Building2,
 		CircleUser,
+		FlaskConical,
 		Globe,
 		LayoutDashboard,
-		LayoutGrid,
 		LayoutTemplate,
+		LogOut,
 		Mail,
 		PanelLeft,
 		PanelLeftClose,
@@ -48,6 +51,7 @@
 		{ href: '/admin/businesses', label: m.nav_businesses(), icon: Building2 },
 		{ href: '/admin/templates', label: m.nav_templates(), icon: LayoutTemplate },
 		{ href: '/admin/invites', label: m.nav_invites(), icon: Mail },
+		{ href: '/admin/trials', label: m.nav_trials(), icon: FlaskConical },
 		{ href: '/admin/team', label: m.nav_team(), icon: Users },
 		{ href: '/admin/config', label: m.nav_config(), icon: Settings2 }
 	]);
@@ -56,7 +60,7 @@
 		onAccount
 			? m.common_account()
 			: (links.find((link) => isActive(link.href, 'exact' in link && link.exact))?.label ??
-				m.common_loomline_admin())
+				m.common_nextup_admin())
 	);
 
 	/** Default `full` for SSR; restored from localStorage in onMount. */
@@ -65,6 +69,7 @@
 	let isMdUp = $state(false);
 	/** Bound to the daisyUI drawer checkbox (overlay open state). */
 	let drawerOpen = $state(false);
+	let signingOut = $state(false);
 
 	const iconOnly = $derived(isMdUp && mode === 'icon');
 	/** Hidden mode on md+ uses the same overlay drawer as small screens (not a pinned rail). */
@@ -157,12 +162,14 @@
 	<input id={DRAWER_ID} type="checkbox" class="drawer-toggle" bind:checked={drawerOpen} />
 
 	<div class="drawer-content flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-x-hidden">
-		<header class="{washRecipes.navbar} sticky top-0 z-30 min-h-14 gap-2 px-3 md:px-5">
+		<header
+			class="{washRecipes.navbar} sticky top-0 z-30 box-border flex h-12 max-h-12 min-h-12 shrink-0 items-center gap-2 px-3 py-0 md:px-4"
+		>
 			<div class="flex-none">
 				<div class="tooltip tooltip-primary tooltip-right" data-tip={sidebarControlTip}>
 					<button
 						type="button"
-						class="btn btn-ghost btn-square btn-primary cursor-pointer"
+						class="btn btn-ghost btn-square btn-sm btn-primary cursor-pointer"
 						aria-label={sidebarControlTip}
 						aria-expanded={(!isMdUp || burgerMode) && drawerOpen}
 						onclick={onSidebarControlClick}
@@ -173,21 +180,12 @@
 			</div>
 
 			<div class="min-w-0 flex-1">
-				<p class="truncate text-base font-semibold sm:text-lg">{pageTitle}</p>
+				<p class="truncate text-sm font-semibold sm:text-base">{pageTitle}</p>
 			</div>
 
 			<div class="flex shrink-0 items-center gap-1 sm:gap-2">
-				<div class="tooltip tooltip-secondary tooltip-bottom" data-tip={m.common_workspaces()}>
-					<a
-						href={resolve('/workspaces')}
-						class="btn btn-ghost btn-square btn-secondary cursor-pointer"
-						aria-label={m.common_workspaces()}
-					>
-						<LayoutGrid class="size-4" aria-hidden="true" />
-					</a>
-				</div>
-				<AppearanceMenu />
-				<LanguageMenu />
+				<AppearanceMenu size="sm" />
+				<LanguageMenu size="sm" />
 			</div>
 		</header>
 
@@ -200,40 +198,39 @@
 	<div class="drawer-side z-40 {iconOnly ? 'md:!overflow-visible' : ''}">
 		<label for={DRAWER_ID} class="drawer-overlay cursor-pointer" aria-label={m.common_close_menu()}></label>
 		<aside
-			class="border-base-300 bg-base-100 flex min-h-full {asideWidthClass} flex-col border-e py-5 transition-[width] duration-200 md:sticky md:top-0 md:h-[100dvh] {iconOnly
-				? 'items-center overflow-visible px-0'
-				: 'overflow-hidden px-3'}"
+			class="border-base-300 bg-base-100 flex min-h-full {asideWidthClass} flex-col border-e px-0 pb-4 pt-0 transition-[width] duration-200 md:sticky md:top-0 md:h-[100dvh] {iconOnly
+				? 'items-center overflow-visible'
+				: 'overflow-hidden'}"
 			data-sidebar-mode={mode}
 		>
+			<!-- Same outer height as page header: h-12 + border-b on one box-border element. -->
 			<a
 				href={resolve('/admin')}
-				class="mb-1 flex w-full cursor-pointer items-center rounded-lg py-1.5 {iconOnly
+				class="border-base-300 box-border flex h-12 max-h-12 min-h-12 w-full min-w-0 shrink-0 cursor-pointer items-center border-b {iconOnly
 					? 'justify-center px-0'
-					: 'gap-2.5 px-2'}"
+					: 'gap-2 px-5'}"
 				onclick={closeDrawer}
 			>
 				<img
-					src={favicon}
+					src={appIcon}
 					alt=""
-					width="36"
-					height="36"
-					class="size-9 shrink-0 rounded-lg"
+					width="28"
+					height="28"
+					class="size-7 shrink-0"
 					aria-hidden="true"
 				/>
 				{#if !iconOnly}
-					<span class="min-w-0">
-						<span class="block font-semibold leading-tight">{m.common_loomline_admin()}</span>
-					</span>
+					<span class="truncate text-sm font-semibold">{m.common_nextup_admin()}</span>
 				{:else}
-					<span class="sr-only">{m.common_loomline_admin()}</span>
+					<span class="sr-only">{m.common_nextup_admin()}</span>
 				{/if}
 			</a>
 
 			<nav
-				class="mt-5 flex min-h-0 w-full flex-1 flex-col {iconOnly
+				class="mt-3 flex min-h-0 w-full flex-1 flex-col {iconOnly
 					? 'items-center overflow-visible'
-					: 'overflow-y-auto'}"
-				aria-label={m.common_loomline_admin()}
+					: 'overflow-y-auto px-3'}"
+				aria-label={m.common_nextup_admin()}
 			>
 				{#if iconOnly}
 					<ul class="flex w-full flex-col items-center gap-0.5 overflow-visible p-0">
@@ -280,14 +277,11 @@
 			</nav>
 
 			<div class="mt-auto w-full shrink-0">
-				<div
-					class="border-base-300 border-t {iconOnly ? '' : '-mx-3'}"
-					aria-hidden="true"
-				></div>
+				<div class="border-base-300 border-t" aria-hidden="true"></div>
 				<div
 					class="flex flex-col gap-0.5 {iconOnly
 						? 'items-center py-2'
-						: 'overflow-visible py-2'}"
+						: 'overflow-visible px-3 py-2'}"
 				>
 					{#if burgerMode}
 						<button
@@ -300,6 +294,15 @@
 							Full sidebar
 						</button>
 					{/if}
+
+					<form
+						id="admin-shell-logout"
+						method="POST"
+						action={resolve('/auth/logout')}
+						class="hidden"
+						aria-hidden="true"
+						use:enhance={bindSubmitting((v) => (signingOut = v))}
+					></form>
 
 					{#if iconOnly}
 						<a
@@ -321,6 +324,21 @@
 						>
 							<Globe class="size-4 shrink-0" aria-hidden="true" />
 						</a>
+						<button
+							type="submit"
+							form="admin-shell-logout"
+							class="btn btn-ghost btn-square btn-sm btn-error tooltip tooltip-right tooltip-error"
+							class:cursor-pointer={!signingOut}
+							class:cursor-not-allowed={signingOut}
+							class:btn-disabled={signingOut}
+							class:loading={signingOut}
+							data-tip={m.common_sign_out()}
+							aria-label={m.common_sign_out()}
+							disabled={signingOut}
+							aria-busy={signingOut}
+						>
+							<LogOut class="size-4 shrink-0" aria-hidden="true" />
+						</button>
 					{:else}
 						<ul class="menu menu-sm w-full gap-0.5 overflow-visible p-0">
 							<li class="overflow-visible">
@@ -345,6 +363,22 @@
 									<Globe class="size-4 shrink-0" aria-hidden="true" />
 									{m.common_website()}
 								</a>
+							</li>
+							<li class="overflow-visible">
+								<button
+									type="submit"
+									form="admin-shell-logout"
+									class="btn btn-ghost btn-error btn-sm h-auto min-h-0 justify-start gap-2 px-3 font-normal"
+									class:cursor-pointer={!signingOut}
+									class:cursor-not-allowed={signingOut}
+									class:btn-disabled={signingOut}
+									class:loading={signingOut}
+									disabled={signingOut}
+									aria-busy={signingOut}
+								>
+									<LogOut class="size-4 shrink-0" aria-hidden="true" />
+									{m.common_sign_out()}
+								</button>
 							</li>
 						</ul>
 					{/if}

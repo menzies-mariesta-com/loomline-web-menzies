@@ -3,15 +3,21 @@
 	import HomeNav from '#lib/component/own/local/public/home/HomeNav.svelte';
 	import HomeFooter from '#lib/component/own/local/public/home/HomeFooter.svelte';
 	import PricingPlans from '#lib/component/own/local/public/home/PricingPlans.svelte';
+	import PricingTrialRequest from '#lib/component/own/local/public/home/PricingTrialRequest.svelte';
 	import PricingAudienceFaq from '#lib/component/own/local/public/home/PricingAudienceFaq.svelte';
 	import { m } from '#lib/paraglide/messages';
+	import { CLOUD_MONTHLY_USD, onpremMonthlyUsd } from '#lib/tool/pricing';
 
-	let { data } = $props();
+	let { data, form } = $props();
 
 	const title = $derived(m.pricing_seo_title());
 	const description = $derived(m.pricing_seo_description());
 	const canonical = $derived(`${data.origin.replace(/\/$/, '')}/pricing`);
-	const ogImage = $derived(`${data.origin.replace(/\/$/, '')}/og-loomline.png`);
+	const ogImage = $derived(`${data.origin.replace(/\/$/, '')}/og-nextup.png`);
+
+	const onpremStarter = onpremMonthlyUsd(CLOUD_MONTHLY_USD.starter);
+	const onpremBusiness = onpremMonthlyUsd(CLOUD_MONTHLY_USD.business);
+	const onpremScale = onpremMonthlyUsd(CLOUD_MONTHLY_USD.scale);
 
 	const jsonLd = $derived(
 		JSON.stringify([
@@ -23,14 +29,14 @@
 				url: canonical,
 				isPartOf: {
 					'@type': 'WebSite',
-					name: m.brand_loomline(),
+					name: m.brand_nextup(),
 					url: data.origin.replace(/\/$/, '')
 				}
 			},
 			{
 				'@context': 'https://schema.org',
 				'@type': 'SoftwareApplication',
-				name: m.brand_loomline_qms(),
+				name: m.brand_nextup_qms(),
 				applicationCategory: 'BusinessApplication',
 				operatingSystem: 'Web',
 				url: canonical,
@@ -38,36 +44,72 @@
 				offers: [
 					{
 						'@type': 'Offer',
-						name: m.pricing_plan_starter_name(),
-						price: '49',
+						name: `Cloud ${m.pricing_plan_starter_name()}`,
+						price: String(CLOUD_MONTHLY_USD.starter),
 						priceCurrency: 'USD',
 						priceSpecification: {
 							'@type': 'UnitPriceSpecification',
-							price: '49',
+							price: String(CLOUD_MONTHLY_USD.starter),
 							priceCurrency: 'USD',
 							billingDuration: 'P1M'
 						}
 					},
 					{
 						'@type': 'Offer',
-						name: m.pricing_plan_business_name(),
-						price: '149',
+						name: `Cloud ${m.pricing_plan_business_name()}`,
+						price: String(CLOUD_MONTHLY_USD.business),
 						priceCurrency: 'USD',
 						priceSpecification: {
 							'@type': 'UnitPriceSpecification',
-							price: '149',
+							price: String(CLOUD_MONTHLY_USD.business),
 							priceCurrency: 'USD',
 							billingDuration: 'P1M'
 						}
 					},
 					{
 						'@type': 'Offer',
-						name: m.pricing_plan_scale_name(),
-						price: '299',
+						name: `Cloud ${m.pricing_plan_scale_name()}`,
+						price: String(CLOUD_MONTHLY_USD.scale),
 						priceCurrency: 'USD',
 						priceSpecification: {
 							'@type': 'UnitPriceSpecification',
-							price: '299',
+							price: String(CLOUD_MONTHLY_USD.scale),
+							priceCurrency: 'USD',
+							billingDuration: 'P1M'
+						}
+					},
+					{
+						'@type': 'Offer',
+						name: `On-premise ${m.pricing_plan_starter_name()}`,
+						price: String(onpremStarter),
+						priceCurrency: 'USD',
+						priceSpecification: {
+							'@type': 'UnitPriceSpecification',
+							price: String(onpremStarter),
+							priceCurrency: 'USD',
+							billingDuration: 'P1M'
+						}
+					},
+					{
+						'@type': 'Offer',
+						name: `On-premise ${m.pricing_plan_business_name()}`,
+						price: String(onpremBusiness),
+						priceCurrency: 'USD',
+						priceSpecification: {
+							'@type': 'UnitPriceSpecification',
+							price: String(onpremBusiness),
+							priceCurrency: 'USD',
+							billingDuration: 'P1M'
+						}
+					},
+					{
+						'@type': 'Offer',
+						name: `On-premise ${m.pricing_plan_scale_name()}`,
+						price: String(onpremScale),
+						priceCurrency: 'USD',
+						priceSpecification: {
+							'@type': 'UnitPriceSpecification',
+							price: String(onpremScale),
 							priceCurrency: 'USD',
 							billingDuration: 'P1M'
 						}
@@ -86,7 +128,7 @@
 	<meta property="og:description" content={description} />
 	<meta property="og:url" content={canonical} />
 	<meta property="og:type" content="website" />
-	<meta property="og:site_name" content={m.brand_loomline()} />
+	<meta property="og:site_name" content={m.brand_nextup()} />
 	<meta property="og:image" content={ogImage} />
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:title" content={title} />
@@ -100,6 +142,7 @@
 	<HomeNav />
 	<main>
 		<PricingPlans />
+		<PricingTrialRequest {form} />
 		<PricingAudienceFaq />
 	</main>
 	<HomeFooter />

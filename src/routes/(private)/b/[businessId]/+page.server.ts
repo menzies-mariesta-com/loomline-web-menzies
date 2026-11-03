@@ -1,15 +1,31 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
-import { and, asc, count, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db';
-import { counter, department, site, ticket } from '#lib/server/db/schema';
+import {
+	appointment,
+	counter,
+	department,
+	displayDevice,
+	membership,
+	queue,
+	site,
+	ticket,
+	ticketEvent
+} from '#lib/server/db/schema';
 import { deepBusinessAnalytics } from '#lib/server/qms/analytics';
 import { requireBusinessRole, requireGuestOrStaff } from '#lib/server/qms/guards';
 
+function startOfUtcDay(d = new Date()) {
+	return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
 export const load: PageServerLoad = async ({ locals, params, url }) => {
-	const { business, membership } = await requireGuestOrStaff(locals.user, params.businessId);
-	const role =
-		membership?.role ?? (membership === null ? 'platform_admin' : 'guest');
+	const { business, membership: member } = await requireGuestOrStaff(
+		locals.user,
+		params.businessId
+	);
+	const role = member?.role ?? (member === null ? 'platform_admin' : 'guest');
 	const isStaff = ['platform_admin', 'business_owner', 'manager', 'counter_agent'].includes(role);
 	const canSetup = ['platform_admin', 'business_owner', 'manager'].includes(role);
 	const canAnalytics = canSetup;
@@ -18,15 +34,71 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const daysRaw = Number(url.searchParams.get('days') ?? 7);
 	const days = [1, 7, 30].includes(daysRaw) ? daysRaw : 7;
 
-	const [departments, counters, sites] = await Promise.all([
-		db
-			.select()
-			.from(department)
-			.where(eq(department.businessId, business.id))
-			.orderBy(asc(department.sortOrder), asc(department.name)),
-		db.select().from(counter).where(eq(counter.businessId, business.id)),
-		db.select().from(site).where(eq(site.businessId, business.id))
-	]);
+	const todayStart = startOfUtcDay();
+	const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60_000);
+
+	const emptyInventory = {
+		sites: 0,
+		sitesOpen: 0,
+		queues: 0,
+		queuesActive: 0,
+		devices: 0,
+		devicesActive: 0,
+		devicesInactive: 0,
+		team: 0,
+		appointmentsToday: 0,
+		counters: 0,
+		openCounters: 0
+	};
+
+	const [departments, counters, sites, queueRows, deviceRows, teamRow, appointmentsTodayRow] =
+		await Promise.all([
+			db
+				.select()
+				.from(department)
+				.where(eq(department.businessId, business.id))
+				.orderBy(asc(department.sortOrder), asc(department.name)),
+			db.select().from(counter).where(eq(counter.businessId, business.id)),
+			db.select().from(site).where(eq(site.businessId, business.id)),
+			isStaff
+				? db
+						.select({
+							total: count(),
+							active: sql<number>`count(*) filter (where ${queue.isActive} = true)::int`
+						})
+						.from(queue)
+						.where(eq(queue.businessId, business.id))
+				: Promise.resolve([{ total: 0, active: 0 }]),
+			isStaff
+				? db
+						.select({
+							total: count(),
+							active: sql<number>`count(*) filter (where ${displayDevice.isActive} = true)::int`,
+							inactive: sql<number>`count(*) filter (where ${displayDevice.isActive} = false)::int`
+						})
+						.from(displayDevice)
+						.where(eq(displayDevice.businessId, business.id))
+				: Promise.resolve([{ total: 0, active: 0, inactive: 0 }]),
+			canSetup
+				? db
+						.select({ total: count() })
+						.from(membership)
+						.where(and(eq(membership.businessId, business.id), eq(membership.status, 'active')))
+				: Promise.resolve([{ total: 0 }]),
+			canSetup
+				? db
+						.select({ total: count() })
+						.from(appointment)
+						.where(
+							and(
+								eq(appointment.businessId, business.id),
+								gte(appointment.startsAt, todayStart),
+								lt(appointment.startsAt, tomorrowStart),
+								inArray(appointment.status, ['scheduled', 'checked_in'])
+							)
+						)
+				: Promise.resolve([{ total: 0 }])
+		]);
 
 	const siteById = Object.fromEntries(sites.map((s) => [s.id, s]));
 	const departmentsWithCounters = departments.map((d) => ({
@@ -38,6 +110,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	}));
 
 	const openCounterCount = counters.filter((c) => c.status === 'open').length;
+	const sitesOpen = sites.filter((s) => s.isOpen).length;
 
 	const statusRows = await db
 		.select({ status: ticket.status, total: count() })
@@ -62,21 +135,51 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		}
 	}
 
-	const activeTickets = await db
-		.select()
-		.from(ticket)
-		.where(
-			and(
-				eq(ticket.businessId, business.id),
-				inArray(ticket.status, ['waiting', 'called', 'serving', 'held'])
+	const [activeTickets, recentEvents, analytics] = await Promise.all([
+		db
+			.select()
+			.from(ticket)
+			.where(
+				and(
+					eq(ticket.businessId, business.id),
+					inArray(ticket.status, ['waiting', 'called', 'serving', 'held'])
+				)
 			)
-		)
-		.orderBy(desc(ticket.createdAt))
-		.limit(30);
+			.orderBy(desc(ticket.createdAt))
+			.limit(30),
+		isStaff
+			? db
+					.select({
+						id: ticketEvent.id,
+						type: ticketEvent.type,
+						createdAt: ticketEvent.createdAt,
+						ticketNumber: ticket.number,
+						ticketId: ticket.id
+					})
+					.from(ticketEvent)
+					.innerJoin(ticket, eq(ticketEvent.ticketId, ticket.id))
+					.where(eq(ticketEvent.businessId, business.id))
+					.orderBy(desc(ticketEvent.createdAt))
+					.limit(12)
+			: Promise.resolve([]),
+		canAnalytics ? deepBusinessAnalytics(business.id, days) : Promise.resolve(null)
+	]);
 
-	const analytics = canAnalytics
-		? await deepBusinessAnalytics(business.id, days)
-		: null;
+	const inventory = isStaff
+		? {
+				sites: sites.length,
+				sitesOpen,
+				queues: Number(queueRows[0]?.total ?? 0),
+				queuesActive: Number(queueRows[0]?.active ?? 0),
+				devices: Number(deviceRows[0]?.total ?? 0),
+				devicesActive: Number(deviceRows[0]?.active ?? 0),
+				devicesInactive: Number(deviceRows[0]?.inactive ?? 0),
+				team: Number(teamRow[0]?.total ?? 0),
+				appointmentsToday: Number(appointmentsTodayRow[0]?.total ?? 0),
+				counters: counters.length,
+				openCounters: openCounterCount
+			}
+		: emptyInventory;
 
 	return {
 		brand: {
@@ -91,7 +194,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		departments: departmentsWithCounters,
 		openCounterCount,
 		kpi,
+		inventory,
 		activeTickets,
+		recentEvents,
 		needsSetup: departmentsWithCounters.length === 0,
 		sites,
 		days,

@@ -12,13 +12,17 @@
 
 	let { children } = $props();
 
-	/** Full-bleed Wash shell (no nested washPanel): auth, marketing, TV/kiosk, private apps. */
+	/** Full-bleed Wash shell (no nested washPanel): auth, marketing, errors, TV/kiosk, private apps. */
 	const isChromeFree = $derived.by(() => {
+		if (page.error) return true;
 		const path = page.url.pathname;
 		return (
 			path.startsWith('/auth') ||
 			path === '/' ||
 			path === '/pricing' ||
+			path === '/privacy' ||
+			path === '/terms' ||
+			path.startsWith('/docs') ||
 			path.startsWith('/display') ||
 			path.startsWith('/kiosk') ||
 			path.startsWith('/t/') ||
@@ -33,7 +37,9 @@
 	});
 
 	onMount(() => {
-		initWash({ defaultPigment: 'mineral', defaultMode: 'light' });
+		// Do not pass defaultPigment/defaultMode: those override localStorage and wipe
+		// the user's Soft Wash choice on every reload. Package falls back to mineral/light.
+		initWash();
 	});
 </script>
 

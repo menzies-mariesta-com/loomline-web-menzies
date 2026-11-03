@@ -1,4 +1,4 @@
-/** Apex chart option builders for Loomline admin dashboards. */
+/** Apex chart option builders for NextUp admin dashboards. */
 
 const washColors = [
 	'var(--color-primary)',

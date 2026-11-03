@@ -8,7 +8,7 @@
 </script>
 
 <svelte:head>
-	<title>{m.workspaces_title()} | {m.brand_loomline()}</title>
+	<title>{m.workspaces_title()} | {m.brand_nextup()}</title>
 	<meta name="robots" content="noindex,nofollow" />
 </svelte:head>
 
@@ -16,7 +16,7 @@
 	<div class="mx-auto flex w-full max-w-lg flex-col gap-4">
 		<div>
 			<h1 class="card-title text-primary font-bold">{m.workspaces_title()}</h1>
-			<p class="text-sm opacity-70">{m.workspaces_pick_lead()}</p>
+			<p class="text-ink-muted text-sm">{m.workspaces_pick_lead()}</p>
 		</div>
 
 		{#if data.platformAdmin}
@@ -25,7 +25,7 @@
 				class="btn btn-outline btn-sm w-fit cursor-pointer gap-2"
 			>
 				<Shield class="size-4" aria-hidden="true" />
-				{m.common_loomline_admin()}
+				{m.common_nextup_admin()}
 			</a>
 		{/if}
 
@@ -41,7 +41,7 @@
 					</li>
 				{/if}
 			{:else}
-				<li class="disabled opacity-60"><span>{m.account_no_memberships()}</span></li>
+				<li class="text-ink-muted disabled"><span>{m.account_no_memberships()}</span></li>
 			{/each}
 		</ul>
 	</div>

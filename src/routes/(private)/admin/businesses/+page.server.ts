@@ -6,25 +6,24 @@ import {
 	appointment,
 	business,
 	industryPack,
-	invite,
 	platformConfigProfile,
 	ticket,
 	transfer
 } from '#lib/server/db/schema';
 import { requirePlatformAdmin } from '#lib/server/qms/guards';
-import {
-	applyIndustryPackToBusiness,
-	businessSlugFromName
-} from '#lib/server/qms/business-bootstrap';
 import { ensureConfigProfilesSeeded, getConfigProfile } from '#lib/server/qms/config-profiles';
-import { randomToken } from '#lib/server/qms/ids';
 import { writeAudit } from '#lib/server/qms/audit';
-import { inviteSetPasswordUrl } from '#lib/server/qms/email';
-import { enqueueAndDeliverNotification } from '#lib/server/qms/notify';
+import { provisionOwnerBusiness } from '#lib/server/qms/provision-owner-business';
 import { saveOrgImage } from '#lib/server/upload/org-image';
-import { ORIGIN } from '$app/env/private';
+import {
+	isPaidPlanKey,
+	isTrialDuration,
+	parsePlanKey,
+	trialEndsAtFrom,
+	type TrialDuration
+} from '#lib/tool/plans';
 
-const BUSINESS_STATUSES = new Set(['active', 'suspended', 'pending']);
+const BUSINESS_STATUSES = new Set(['active', 'suspended', 'pending', 'inactive', 'trial_expired']);
 
 export const load: PageServerLoad = async ({ locals }) => {
 	await requirePlatformAdmin(locals.user);
@@ -55,6 +54,9 @@ export const actions: Actions = {
 			.trim()
 			.toLowerCase();
 		const timezoneOverride = String(form.get('timezone') ?? '').trim();
+		const accessKindRaw = String(form.get('accessKind') ?? 'plan').trim();
+		const planKey = String(form.get('planKey') ?? '').trim();
+		const trialDuration = String(form.get('trialDuration') ?? '').trim();
 		const imageFile = form.get('image');
 
 		if (!name || !packId || !managerEmail) {
@@ -64,23 +66,19 @@ export const actions: Actions = {
 			});
 		}
 
-		let timezone = timezoneOverride || 'Asia/Yangon';
-		let localeDefault = 'en';
-		let configId: string | null = configIdRaw || null;
-		let branding: Record<string, unknown> = {};
-
-		if (configId) {
-			const profile = await getConfigProfile(configId);
-			if (!profile) {
-				return fail(400, { message: 'Selected config was not found.', success: false });
+		const accessKind = accessKindRaw === 'trial' ? 'trial' : 'plan';
+		if (accessKind === 'trial') {
+			if (!isTrialDuration(trialDuration)) {
+				return fail(400, {
+					message: 'Trial duration must be 7 days, 2 weeks, or 1 month.',
+					success: false
+				});
 			}
-			timezone = timezoneOverride || profile.timezone;
-			localeDefault = profile.locale;
-			branding = {
-				dateFormat: profile.dateFormat,
-				timeFormat: profile.timeFormat,
-				currency: profile.currency
-			};
+		} else if (!isPaidPlanKey(planKey)) {
+			return fail(400, {
+				message: 'Select a Cloud or On-premise paying plan.',
+				success: false
+			});
 		}
 
 		let imageUrl: string | null = null;
@@ -93,70 +91,32 @@ export const actions: Actions = {
 			}
 		}
 
-		let slug = businessSlugFromName(name);
-		const clash = await db.query.business.findFirst({ where: eq(business.slug, slug) });
-		if (clash) slug = `${slug}-${Date.now().toString(36)}`;
-
-		const [biz] = await db
-			.insert(business)
-			.values({
-				name,
-				slug,
-				timezone,
-				localeDefault,
-				status: 'active',
-				industryPackId: packId,
-				configId,
-				imageUrl,
-				branding,
-				inviteCode: randomToken(8)
-			})
-			.returning();
-
-		await applyIndustryPackToBusiness(biz.id, packId);
-
-		const token = randomToken(24);
-		const inviteUrl = inviteSetPasswordUrl(ORIGIN, token);
-		await db.insert(invite).values({
-			businessId: biz.id,
-			email: managerEmail,
-			role: 'business_owner',
-			token,
-			status: 'pending',
-			invitedByUserId: admin.id,
-			expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60_000)
-		});
-
-		const { result: mailResult } = await enqueueAndDeliverNotification({
-			businessId: biz.id,
-			channel: 'email',
-			toAddress: managerEmail,
-			templateKey: 'owner_invite',
-			payload: {
-				businessName: biz.name,
-				inviteUrl,
-				roleLabel: 'business owner'
-			}
-		});
-
-		await writeAudit({
+		const provisioned = await provisionOwnerBusiness({
 			actorUserId: admin.id,
-			businessId: biz.id,
-			action: 'business.create',
-			entityType: 'business',
-			entityId: biz.id,
-			payload: { managerEmail, packId, configId, imageUrl, inviteDelivered: mailResult.ok }
+			businessName: name,
+			ownerEmail: managerEmail,
+			industryPackId: packId,
+			configId: configIdRaw || null,
+			timezoneOverride: timezoneOverride || undefined,
+			imageUrl,
+			accessKind,
+			planKey: accessKind === 'plan' ? planKey : null,
+			trialDuration: accessKind === 'trial' ? trialDuration : null
 		});
 
-		const inviteNote = mailResult.ok
-			? mailResult.loggedOnly
+		if (!provisioned.ok) {
+			return fail(400, { message: provisioned.message, success: false });
+		}
+
+		const inviteNote = provisioned.inviteDelivered
+			? provisioned.loggedOnly
 				? `Invite queued for ${managerEmail} (link logged on server; set SMTP_* to email it).`
 				: `Invite sent to ${managerEmail}.`
-			: `Invite created for ${managerEmail} (email queued for retry).`;
+			: `Invite created for ${managerEmail}, but email failed. Check SMTP_* and resend from Invites.`;
 
 		return {
-			success: true,
-			message: `Business ${biz.name} created. ${inviteNote}`
+			success: provisioned.inviteDelivered,
+			message: `Business ${provisioned.business.name} created. ${inviteNote}`
 		};
 	},
 
@@ -199,6 +159,9 @@ export const actions: Actions = {
 		const configIdRaw = String(form.get('configId') ?? '').trim();
 		const timezoneOverride = String(form.get('timezone') ?? '').trim();
 		const statusRaw = String(form.get('status') ?? '').trim();
+		const accessKindRaw = String(form.get('accessKind') ?? '').trim();
+		const planKeyRaw = String(form.get('planKey') ?? '').trim();
+		const trialDurationRaw = String(form.get('trialDuration') ?? '').trim();
 		const imageFile = form.get('image');
 
 		if (!id || !name) {
@@ -210,6 +173,46 @@ export const actions: Actions = {
 
 		if (statusRaw && !BUSINESS_STATUSES.has(statusRaw)) {
 			return fail(400, { message: 'Invalid status.', success: false });
+		}
+
+		const accessKind =
+			accessKindRaw === 'trial'
+				? 'trial'
+				: accessKindRaw === 'plan'
+					? 'plan'
+					: existing.planKey === 'trial'
+						? 'trial'
+						: 'plan';
+
+		let nextPlanKey = existing.planKey;
+		let nextServiceMode = existing.serviceMode;
+		let nextTrialDuration: TrialDuration | null = existing.trialDuration ?? null;
+		let nextTrialEndsAt: Date | null = existing.trialEndsAt ?? null;
+
+		if (accessKind === 'trial') {
+			if (!isTrialDuration(trialDurationRaw)) {
+				return fail(400, {
+					message: 'Trial duration must be 7 days, 2 weeks, or 1 month.',
+					success: false
+				});
+			}
+			nextPlanKey = 'trial';
+			nextServiceMode = 'cloud';
+			if (existing.trialDuration !== trialDurationRaw || !existing.trialEndsAt) {
+				nextTrialEndsAt = trialEndsAtFrom(trialDurationRaw);
+			}
+			nextTrialDuration = trialDurationRaw;
+		} else {
+			if (!isPaidPlanKey(planKeyRaw)) {
+				return fail(400, {
+					message: 'Select a Cloud or On-premise paying plan.',
+					success: false
+				});
+			}
+			nextPlanKey = planKeyRaw;
+			nextServiceMode = parsePlanKey(planKeyRaw)?.mode ?? null;
+			nextTrialDuration = null;
+			nextTrialEndsAt = null;
 		}
 
 		let timezone = timezoneOverride || existing.timezone;
@@ -250,11 +253,20 @@ export const actions: Actions = {
 				name,
 				timezone,
 				localeDefault,
-				status: (statusRaw || existing.status) as 'active' | 'suspended' | 'pending',
+				status: (statusRaw || existing.status) as
+					| 'active'
+					| 'suspended'
+					| 'pending'
+					| 'inactive'
+					| 'trial_expired',
 				industryPackId: packId || null,
 				configId,
 				imageUrl,
-				branding
+				branding,
+				planKey: nextPlanKey,
+				serviceMode: nextServiceMode,
+				trialDuration: nextTrialDuration,
+				trialEndsAt: nextTrialEndsAt
 			})
 			.where(eq(business.id, id))
 			.returning();
@@ -267,7 +279,17 @@ export const actions: Actions = {
 			action: 'business.update',
 			entityType: 'business',
 			entityId: id,
-			payload: { name, packId, configId, status: row.status, imageUrl }
+			payload: {
+				name,
+				packId,
+				configId,
+				status: row.status,
+				imageUrl,
+				planKey: row.planKey,
+				serviceMode: row.serviceMode,
+				trialDuration: row.trialDuration,
+				trialEndsAt: row.trialEndsAt?.toISOString() ?? null
+			}
 		});
 
 		return { success: true, message: `Business "${row.name}" updated.` };

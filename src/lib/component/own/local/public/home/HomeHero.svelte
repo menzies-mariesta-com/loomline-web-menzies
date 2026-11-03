@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { m } from '#lib/paraglide/messages';
+	import MenziesLink from '#lib/component/own/local/public/MenziesLink.svelte';
 	import QueueHeroScene from './QueueHeroScene.svelte';
 </script>
 
@@ -10,9 +11,7 @@
 >
 	<div class="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.25fr)] lg:gap-10">
 		<div class="relative z-10 max-w-xl">
-			<p class="font-display text-primary text-lg font-semibold tracking-tight sm:text-md">
-				{m.brand_menzies_mariesta()}
-			</p>
+			<MenziesLink class="font-display text-primary text-lg font-semibold tracking-tight sm:text-md" />
 			<h1
 				id="hero-heading"
 				class="mt-4 text-3xl leading-tight font-semibold text-[var(--loom-ink)] sm:text-4xl lg:text-[2.75rem]"

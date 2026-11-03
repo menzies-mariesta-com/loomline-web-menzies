@@ -1,12 +1,12 @@
-# Loomline
+# NextUp
 
 Multi-tenant **queue management system (QMS)** for lobbies, counters, and guest journeys. Guests take a number at a kiosk or via QR, agents call tickets from a desk, and TVs announce who is next. One SaaS, many businesses, clear roles.
 
-This repo is the **Loomline web app**: Soft Wash UI on **SvelteKit**, deployed to **Netlify**, with **Neon Postgres**, **Drizzle ORM**, and **better-auth**.
+This repo is the **NextUp web app**: Soft Wash UI on **SvelteKit**, deployed to **Netlify**, with **Neon Postgres**, **Drizzle ORM**, and **better-auth**.
 
 ## Table of contents
 
-- [What is Loomline](#what-is-loomline)
+- [What is NextUp](#what-is-nextup)
 - [Stack](#stack)
 - [Features](#features)
 - [Roles](#roles)
@@ -21,9 +21,9 @@ This repo is the **Loomline web app**: Soft Wash UI on **SvelteKit**, deployed t
 
 ---
 
-## What is Loomline
+## What is NextUp
 
-Loomline is a multi-industry queue and appointment product:
+NextUp is a multi-industry queue and appointment product:
 
 - **Marketing site** for product and pricing
 - **Platform admin** for tenants, industry templates, invites, and platform config
@@ -97,7 +97,7 @@ Membership roles (see `membership_role` enum and `src/lib/server/qms/guards.ts`)
 
 | Role | Who | What they see |
 |------|-----|----------------|
-| `platform_admin` | Loomline operators | `/admin/*` after login. Can open any business. Full business nav when inside `/b/{id}`. |
+| `platform_admin` | NextUp operators | `/admin/*` after login. Can open any business. Full business nav when inside `/b/{id}`. |
 | `business_owner` | Tenant owner | Full business console: setup CRUD, team, config, tickets, appointments, devices, agent desk, Home analytics. |
 | `manager` | Tenant manager | Same console setup and operations as owner for that business (manager-gated routes). |
 | `counter_agent` | Station / desk staff | Narrow nav: **Home** + **Agent** only. Agent devices get a dedicated station login (not a public pairing URL). |

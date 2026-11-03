@@ -26,7 +26,9 @@ import {
 	queueStrategyEnum,
 	ticketEventTypeEnum,
 	ticketSourceEnum,
-	ticketStatusEnum
+	ticketStatusEnum,
+	trialDurationEnum,
+	trialRequestStatusEnum
 } from './enums';
 
 export * from './enums';
@@ -82,9 +84,47 @@ export const business = pgTable(
 		messagingConfig: jsonb('messaging_config').$type<Record<string, unknown>>().notNull().default({}),
 		publicSignupEnabled: boolean('public_signup_enabled').notNull().default(false),
 		inviteCode: text('invite_code'),
+		/** Plan key: cloud_starter…cloud_platform | onprem_starter…onprem_platform | trial */
+		planKey: text('plan_key'),
+		/** cloud | onprem when on a paid plan; null for pure trial until converted */
+		serviceMode: text('service_mode'),
+		trialEndsAt: timestamp('trial_ends_at'),
+		trialDuration: trialDurationEnum('trial_duration'),
 		...timestamps
 	},
-	(t) => [uniqueIndex('business_slug_uidx').on(t.slug), index('business_status_idx').on(t.status)]
+	(t) => [
+		uniqueIndex('business_slug_uidx').on(t.slug),
+		index('business_status_idx').on(t.status),
+		index('business_trial_ends_at_idx').on(t.trialEndsAt)
+	]
+);
+
+/** Pricing-page trial interest; admin approves into a business + owner invite. */
+export const trialRequest = pgTable(
+	'trial_request',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		firstName: text('first_name').notNull(),
+		lastName: text('last_name').notNull(),
+		businessName: text('business_name').notNull(),
+		businessWebsite: text('business_website'),
+		email: text('email').notNull(),
+		message: text('message'),
+		duration: trialDurationEnum('duration').notNull(),
+		status: trialRequestStatusEnum('status').notNull().default('pending'),
+		businessId: uuid('business_id').references(() => business.id, { onDelete: 'set null' }),
+		reviewedByUserId: text('reviewed_by_user_id').references(() => user.id, {
+			onDelete: 'set null'
+		}),
+		reviewedAt: timestamp('reviewed_at'),
+		reviewNote: text('review_note'),
+		...timestamps
+	},
+	(t) => [
+		index('trial_request_status_idx').on(t.status),
+		index('trial_request_email_idx').on(t.email),
+		index('trial_request_created_idx').on(t.createdAt)
+	]
 );
 
 export const membership = pgTable(
@@ -586,7 +626,19 @@ export const businessRelations = relations(business, ({ one, many }) => ({
 	services: many(service),
 	queues: many(queue),
 	departments: many(department),
-	destinations: many(destination)
+	destinations: many(destination),
+	trialRequests: many(trialRequest)
+}));
+
+export const trialRequestRelations = relations(trialRequest, ({ one }) => ({
+	business: one(business, {
+		fields: [trialRequest.businessId],
+		references: [business.id]
+	}),
+	reviewedBy: one(user, {
+		fields: [trialRequest.reviewedByUserId],
+		references: [user.id]
+	})
 }));
 
 export const membershipRelations = relations(membership, ({ one, many }) => ({

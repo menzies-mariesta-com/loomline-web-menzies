@@ -25,7 +25,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 	return new Response(lines.join('\n'), {
 		headers: {
 			'Content-Type': 'text/csv',
-			'Content-Disposition': `attachment; filename="loomline-${business.id}-${days}d.csv"`
+			'Content-Disposition': `attachment; filename="nextup-${business.id}-${days}d.csv"`
 		}
 	});
 };

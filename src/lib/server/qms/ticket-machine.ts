@@ -101,7 +101,7 @@ export async function issueTicket(input: IssueTicketInput) {
 			toAddress: created.phone,
 			templateKey: 'ticket_issued',
 			payload: {
-				body: `Your Loomline ticket is ${created.number}. Track: /t/${created.publicToken}`
+				body: `Your NextUp ticket is ${created.number}. Track: /t/${created.publicToken}`
 			}
 		});
 	}
@@ -131,19 +131,11 @@ export async function callNext(opts: {
 	actorUserId: string;
 	businessId: string;
 }) {
-	const q = await db.query.queue.findFirst({ where: eq(queue.id, opts.queueId) });
-	if (!q) throw new Error('Queue not found');
-
-	const c = await db.query.counter.findFirst({ where: eq(counter.id, opts.counterId) });
-	if (!c || c.businessId !== opts.businessId) throw new Error('Counter not found');
-
-	const bindings = await db.query.counterService.findMany({
-		where: eq(counterService.counterId, opts.counterId)
+	const q = await assertCounterCanServeQueue({
+		counterId: opts.counterId,
+		queueId: opts.queueId,
+		businessId: opts.businessId
 	});
-	if (bindings.length > 0) {
-		const allowed = bindings.some((b) => b.serviceId === q.serviceId);
-		if (!allowed) throw new Error('This counter cannot serve this queue service');
-	}
 
 	const orderBy =
 		q.strategy === 'priority' || q.strategy === 'appointment_first'
@@ -157,6 +149,45 @@ export async function callNext(opts: {
 
 	if (!next) return null;
 
+	return markTicketCalled({
+		ticketRow: next,
+		counterId: opts.counterId,
+		actorUserId: opts.actorUserId,
+		queueId: opts.queueId,
+		almostYourTurnThreshold: q.almostYourTurnThreshold,
+		slaMinutes: q.slaMinutes
+	});
+}
+
+async function assertCounterCanServeQueue(opts: {
+	counterId: string;
+	queueId: string;
+	businessId: string;
+}) {
+	const q = await db.query.queue.findFirst({ where: eq(queue.id, opts.queueId) });
+	if (!q) throw new Error('Queue not found');
+
+	const c = await db.query.counter.findFirst({ where: eq(counter.id, opts.counterId) });
+	if (!c || c.businessId !== opts.businessId) throw new Error('Counter not found');
+
+	const bindings = await db.query.counterService.findMany({
+		where: eq(counterService.counterId, opts.counterId)
+	});
+	if (bindings.length > 0) {
+		const allowed = bindings.some((b) => b.serviceId === q.serviceId);
+		if (!allowed) throw new Error('This counter cannot serve this queue service');
+	}
+	return q;
+}
+
+async function markTicketCalled(opts: {
+	ticketRow: TicketRow;
+	counterId: string;
+	actorUserId: string;
+	queueId: string;
+	almostYourTurnThreshold: number;
+	slaMinutes: number;
+}) {
 	const [updated] = await db
 		.update(ticket)
 		.set({
@@ -164,10 +195,10 @@ export async function callNext(opts: {
 			counterId: opts.counterId,
 			calledAt: new Date()
 		})
-		.where(and(eq(ticket.id, next.id), eq(ticket.status, 'waiting')))
+		.where(and(eq(ticket.id, opts.ticketRow.id), eq(ticket.status, 'waiting')))
 		.returning();
 
-	if (!updated) return null;
+	if (!updated) throw new Error('Ticket was already updated — refresh and try again');
 
 	await writeEvent(updated.id, updated.businessId, 'called', opts.actorUserId, {
 		counterId: opts.counterId
@@ -183,10 +214,37 @@ export async function callNext(opts: {
 		});
 	}
 
-	await maybeFlagAlmostYourTurn(opts.queueId, q.almostYourTurnThreshold);
-	await maybeFlagSlaBreaches(opts.queueId, q.slaMinutes);
+	await maybeFlagAlmostYourTurn(opts.queueId, opts.almostYourTurnThreshold);
+	await maybeFlagSlaBreaches(opts.queueId, opts.slaMinutes);
 
 	return updated;
+}
+
+/** Call a specific waiting ticket (row action on agent desk). */
+export async function callTicket(opts: {
+	ticketId: string;
+	counterId: string;
+	actorUserId: string;
+	businessId: string;
+}) {
+	const existing = await db.query.ticket.findFirst({ where: eq(ticket.id, opts.ticketId) });
+	if (!existing || existing.businessId !== opts.businessId) throw new Error('Ticket not found');
+	if (existing.status !== 'waiting') throw new Error('Only waiting tickets can be called');
+
+	const q = await assertCounterCanServeQueue({
+		counterId: opts.counterId,
+		queueId: existing.queueId,
+		businessId: opts.businessId
+	});
+
+	return markTicketCalled({
+		ticketRow: existing,
+		counterId: opts.counterId,
+		actorUserId: opts.actorUserId,
+		queueId: existing.queueId,
+		almostYourTurnThreshold: q.almostYourTurnThreshold,
+		slaMinutes: q.slaMinutes
+	});
 }
 
 async function maybeFlagAlmostYourTurn(queueId: string, threshold: number) {

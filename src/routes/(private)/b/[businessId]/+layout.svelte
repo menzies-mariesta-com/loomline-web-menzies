@@ -1,9 +1,9 @@
 <script lang="ts">
-	import ClientShell from '#lib/component/own/local/private/ClientShell.svelte';
+	import BusinessTopShell from '#lib/component/own/local/private/BusinessTopShell.svelte';
 
 	let { children, data } = $props();
 </script>
 
-<ClientShell platformAdmin={data.platformAdmin}>
+<BusinessTopShell platformAdmin={data.platformAdmin}>
 	{@render children()}
-</ClientShell>
+</BusinessTopShell>

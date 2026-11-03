@@ -14,6 +14,63 @@
 		<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
 		<link rel="icon" href="/favicon.ico" sizes="any" />
 		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<!-- Apply stored Soft Wash theme before paint (keys match menzies-design-wash-ui). -->
+		<script>
+			(function () {
+				try {
+					var themes = {
+						mineral: 1,
+						indigo: 1,
+						celadon: 1,
+						vermilion: 1,
+						sepia: 1,
+						cobalt: 1,
+						moss: 1,
+						saffron: 1,
+						slate: 1,
+						lake: 1,
+						ultramarine: 1,
+						viridian: 1,
+						madder: 1,
+						ochre: 1,
+						umber: 1,
+						ivory: 1,
+						cerulean: 1,
+						crimson: 1,
+						olive: 1,
+						sienna: 1,
+						turquoise: 1,
+						lavender: 1,
+						charcoal: 1,
+						coral: 1,
+						pine: 1,
+						bronze: 1,
+						mist: 1,
+						rust: 1,
+						jade: 1,
+						ink: 1
+					};
+					var raw =
+						localStorage.getItem('design-web-menzies-theme') ||
+						localStorage.getItem('washfield-theme');
+					var mode =
+						localStorage.getItem('design-web-menzies-mode') ||
+						localStorage.getItem('washfield-mode');
+					var pigment = raw;
+					if (raw && raw.indexOf('|') !== -1) pigment = raw.split('|')[0];
+					if (raw && raw.slice(-5) === '-dark') {
+						pigment = raw.slice(0, -5);
+						if (mode !== 'light' && mode !== 'dark') mode = 'dark';
+					}
+					if (!pigment || !themes[pigment]) pigment = 'mineral';
+					if (mode !== 'dark') mode = 'light';
+					document.documentElement.setAttribute(
+						'data-theme',
+						mode === 'dark' ? pigment + '-dark' : pigment
+					);
+				} catch (e) {}
+			})();
+		</script>
 		%sveltekit.head%
 	</head>
 

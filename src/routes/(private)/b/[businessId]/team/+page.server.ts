@@ -1,14 +1,16 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '#lib/server/db';
 import { invite, membership } from '#lib/server/db/schema';
 import { requireBusinessRole } from '#lib/server/qms/guards';
-import { inviteSetPasswordUrl } from '#lib/server/qms/email';
+import { inviteMailToast, inviteSetPasswordUrl, normalizeInviteToken } from '#lib/server/qms/email';
 import { randomToken } from '#lib/server/qms/ids';
-import { enqueueAndDeliverNotification } from '#lib/server/qms/notify';
+import { deliverInviteEmail } from '#lib/server/qms/invite-delivery';
 import { ensureCredentialUser, ensureMembership } from '#lib/server/qms/provision-user';
 import { ORIGIN } from '$app/env/private';
+
+const INVITE_ROLES = new Set(['manager', 'counter_agent', 'guest', 'business_owner']);
 
 export const load: PageServerLoad = async ({ locals, params }) => {
 	const { business } = await requireBusinessRole(locals.user, params.businessId, [
@@ -34,42 +36,91 @@ export const actions: Actions = {
 			'platform_admin'
 		]);
 		const form = await request.formData();
-		const email = String(form.get('email') ?? '').trim().toLowerCase();
-		const role = String(form.get('role') ?? 'counter_agent') as
-			| 'manager'
-			| 'counter_agent'
-			| 'guest'
-			| 'business_owner';
+		const email = String(form.get('email') ?? '')
+			.trim()
+			.toLowerCase();
+		const role = String(form.get('role') ?? 'counter_agent').trim();
 		if (!email) return fail(400, { message: 'Email required', success: false });
-		const token = randomToken(24);
+		if (!INVITE_ROLES.has(role)) {
+			return fail(400, { message: 'Invalid role.', success: false });
+		}
+
+		const pending = await db.query.invite.findFirst({
+			where: and(
+				eq(invite.email, email),
+				eq(invite.businessId, business.id),
+				eq(invite.status, 'pending')
+			)
+		});
+		if (pending) {
+			return fail(400, {
+				message: `A pending invite already exists for ${email}. Resend it from the Invites tab.`,
+				success: false
+			});
+		}
+
+		const token = normalizeInviteToken(randomToken(24));
 		const inviteUrl = inviteSetPasswordUrl(ORIGIN, token);
 		await db.insert(invite).values({
 			businessId: business.id,
 			email,
-			role,
+			role: role as 'manager' | 'counter_agent' | 'guest' | 'business_owner',
 			token,
 			invitedByUserId: user.id,
 			expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60_000),
 			status: 'pending'
 		});
 		const roleLabel = role.replaceAll('_', ' ');
-		const { result: mailResult } = await enqueueAndDeliverNotification({
+		const mailResult = await deliverInviteEmail({
 			businessId: business.id,
-			channel: 'email',
-			toAddress: email,
+			to: email,
 			templateKey: 'team_invite',
-			payload: {
-				businessName: business.name,
-				inviteUrl,
-				roleLabel
-			}
+			businessName: business.name,
+			inviteUrl,
+			roleLabel
 		});
-		const inviteNote = mailResult.ok
-			? mailResult.loggedOnly
-				? `Invite queued for ${email} (link logged on server; set SMTP_* to email it).`
-				: `Invite sent to ${email}.`
-			: `Invite created for ${email} (email queued for retry).`;
-		return { success: true, message: inviteNote };
+		const toast = inviteMailToast(email, mailResult, 'sent');
+		return toast;
+	},
+
+	resendInvite: async ({ request, locals, params }) => {
+		const { business } = await requireBusinessRole(locals.user, params.businessId, [
+			'business_owner',
+			'manager',
+			'platform_admin'
+		]);
+		const form = await request.formData();
+		const inviteId = String(form.get('inviteId') ?? '').trim();
+		if (!inviteId) return fail(400, { message: 'Invite id is required.', success: false });
+
+		const inv = await db.query.invite.findFirst({ where: eq(invite.id, inviteId) });
+		if (!inv || inv.businessId !== business.id) {
+			return fail(404, { message: 'Invite not found.', success: false });
+		}
+		if (inv.status !== 'pending') {
+			return fail(400, { message: 'Only pending invites can be resent.', success: false });
+		}
+
+		const token = normalizeInviteToken(randomToken(24));
+		const inviteUrl = inviteSetPasswordUrl(ORIGIN, token);
+		await db
+			.update(invite)
+			.set({
+				token,
+				expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60_000)
+			})
+			.where(eq(invite.id, inv.id));
+
+		const roleLabel = inv.role.replaceAll('_', ' ');
+		const mailResult = await deliverInviteEmail({
+			businessId: business.id,
+			to: inv.email,
+			templateKey: 'team_invite',
+			businessName: business.name,
+			inviteUrl,
+			roleLabel
+		});
+		return inviteMailToast(inv.email, mailResult, 'resent');
 	},
 
 	provision: async ({ request, locals, params }) => {

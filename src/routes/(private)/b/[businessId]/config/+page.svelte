@@ -20,6 +20,8 @@
 	import { bindSubmitting } from '#lib/tool/form-submit';
 	import PageHeader from '#lib/component/own/local/private/PageHeader.svelte';
 	import SearchSelect from '#lib/component/own/local/private/SearchSelect.svelte';
+	import ToastDismissButton from '#lib/component/own/local/private/ToastDismissButton.svelte';
+	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
 	import {
 		DEFAULT_VOICE_TEMPLATE,
 		normalizeAnnounceLocales,
@@ -124,11 +126,7 @@
 				<CircleX class="h-5 w-5 shrink-0" aria-hidden="true" />
 			{/if}
 			<span>{form.message}</span>
-			<button
-				type="button"
-				class="btn btn-ghost btn-xs cursor-pointer"
-				onclick={() => (dismissedMessage = form.message ?? null)}>Dismiss</button
-			>
+			<ToastDismissButton onclick={() => (dismissedMessage = form.message ?? null)} />
 		</div>
 	</div>
 {/if}
@@ -362,7 +360,7 @@
 							<Globe class="text-base-content/40 size-4 shrink-0" aria-hidden="true" />
 							<span class="min-w-0 flex-1 truncate text-sm font-medium">{localeLabel(code)}</span>
 							<div class="flex shrink-0 items-center gap-0.5">
-								<div class="tooltip tooltip-left" data-tip="Move up">
+								<WashTooltip tooltipText="Move up" className="tooltip-secondary">
 									<button
 										type="button"
 										class="btn btn-ghost btn-square btn-xs cursor-pointer"
@@ -374,8 +372,8 @@
 									>
 										<ArrowUp class="size-3.5" aria-hidden="true" />
 									</button>
-								</div>
-								<div class="tooltip tooltip-left" data-tip="Move down">
+								</WashTooltip>
+								<WashTooltip tooltipText="Move down" className="tooltip-secondary">
 									<button
 										type="button"
 										class="btn btn-ghost btn-square btn-xs cursor-pointer"
@@ -387,8 +385,8 @@
 									>
 										<ArrowDown class="size-3.5" aria-hidden="true" />
 									</button>
-								</div>
-								<div class="tooltip tooltip-left tooltip-error" data-tip="Remove">
+								</WashTooltip>
+								<WashTooltip tooltipText="Remove" className="tooltip-error">
 									<button
 										type="button"
 										class="btn btn-ghost btn-square btn-xs btn-error cursor-pointer"
@@ -400,7 +398,7 @@
 									>
 										<Trash2 class="size-3.5" aria-hidden="true" />
 									</button>
-								</div>
+								</WashTooltip>
 							</div>
 						</li>
 					{/each}

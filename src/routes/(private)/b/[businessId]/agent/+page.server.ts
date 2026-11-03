@@ -13,6 +13,7 @@ import {
 import { requireStaff } from '#lib/server/qms/guards';
 import {
 	callNext,
+	callTicket,
 	completeTicket,
 	getTicketTimeline,
 	holdTicket,
@@ -23,6 +24,11 @@ import {
 	startServing,
 	transferTicket
 } from '#lib/server/qms/ticket-machine';
+
+function actionFail(error: unknown, fallback: string) {
+	const message = error instanceof Error ? error.message : fallback;
+	return fail(400, { message, success: false as const });
+}
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const { business, user } = await requireStaff(locals.user, params.businessId);
@@ -79,7 +85,7 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const queueId = String(form.get('queueId') ?? '');
 		const q = await db.query.queue.findFirst({ where: eq(queue.id, queueId) });
-		if (!q) return fail(400, { message: 'Queue not found' });
+		if (!q) return fail(400, { message: 'Queue not found', success: false as const });
 		try {
 			const t = await issueTicket({
 				businessId: business.id,
@@ -90,51 +96,93 @@ export const actions: Actions = {
 				priority: Number(form.get('priority') ?? 0),
 				actorUserId: user.id
 			});
-			return { success: true, message: `Issued ${t.number}` };
+			return { success: true as const, message: `Issued ${t.number}` };
 		} catch (e) {
-			return fail(400, { message: e instanceof Error ? e.message : 'Issue failed' });
+			return actionFail(e, 'Issue failed');
 		}
 	},
 	callNext: async ({ request, locals, params }) => {
 		const { business, user } = await requireStaff(locals.user, params.businessId);
 		const form = await request.formData();
-		const t = await callNext({
-			queueId: String(form.get('queueId') ?? ''),
-			counterId: String(form.get('counterId') ?? ''),
-			actorUserId: user.id,
-			businessId: business.id
-		});
-		return { success: true, message: t ? `Called ${t.number}` : 'Queue empty' };
+		try {
+			const t = await callNext({
+				queueId: String(form.get('queueId') ?? ''),
+				counterId: String(form.get('counterId') ?? ''),
+				actorUserId: user.id,
+				businessId: business.id
+			});
+			return {
+				success: true as const,
+				message: t ? `Called ${t.number}` : 'Queue empty — issue a ticket first'
+			};
+		} catch (e) {
+			return actionFail(e, 'Call failed');
+		}
+	},
+	callTicket: async ({ request, locals, params }) => {
+		const { business, user } = await requireStaff(locals.user, params.businessId);
+		const form = await request.formData();
+		try {
+			const t = await callTicket({
+				ticketId: String(form.get('ticketId') ?? ''),
+				counterId: String(form.get('counterId') ?? ''),
+				actorUserId: user.id,
+				businessId: business.id
+			});
+			return { success: true as const, message: `Called ${t.number}` };
+		} catch (e) {
+			return actionFail(e, 'Call failed');
+		}
 	},
 	recall: async ({ request, locals, params }) => {
 		const { user } = await requireStaff(locals.user, params.businessId);
 		const form = await request.formData();
-		await recallTicket(String(form.get('ticketId') ?? ''), user.id);
-		return { success: true, message: 'Recalled' };
+		try {
+			await recallTicket(String(form.get('ticketId') ?? ''), user.id);
+			return { success: true as const, message: 'Recalled' };
+		} catch (e) {
+			return actionFail(e, 'Recall failed');
+		}
 	},
 	serve: async ({ request, locals, params }) => {
 		const { user } = await requireStaff(locals.user, params.businessId);
 		const form = await request.formData();
-		await startServing(String(form.get('ticketId') ?? ''), user.id);
-		return { success: true, message: 'Serving' };
+		try {
+			await startServing(String(form.get('ticketId') ?? ''), user.id);
+			return { success: true as const, message: 'Serving' };
+		} catch (e) {
+			return actionFail(e, 'Serve failed');
+		}
 	},
 	complete: async ({ request, locals, params }) => {
 		const { user } = await requireStaff(locals.user, params.businessId);
 		const form = await request.formData();
-		await completeTicket(String(form.get('ticketId') ?? ''), user.id);
-		return { success: true, message: 'Completed' };
+		try {
+			await completeTicket(String(form.get('ticketId') ?? ''), user.id);
+			return { success: true as const, message: 'Completed' };
+		} catch (e) {
+			return actionFail(e, 'Complete failed');
+		}
 	},
 	noShow: async ({ request, locals, params }) => {
 		const { user } = await requireStaff(locals.user, params.businessId);
 		const form = await request.formData();
-		await markNoShow(String(form.get('ticketId') ?? ''), user.id);
-		return { success: true, message: 'No-show' };
+		try {
+			await markNoShow(String(form.get('ticketId') ?? ''), user.id);
+			return { success: true as const, message: 'No-show' };
+		} catch (e) {
+			return actionFail(e, 'No-show failed');
+		}
 	},
 	hold: async ({ request, locals, params }) => {
 		const { user } = await requireStaff(locals.user, params.businessId);
 		const form = await request.formData();
-		await holdTicket(String(form.get('ticketId') ?? ''), user.id);
-		return { success: true, message: 'Held' };
+		try {
+			await holdTicket(String(form.get('ticketId') ?? ''), user.id);
+			return { success: true as const, message: 'Held' };
+		} catch (e) {
+			return actionFail(e, 'Hold failed');
+		}
 	},
 	transfer: async ({ request, locals, params }) => {
 		const { user } = await requireStaff(locals.user, params.businessId);
@@ -146,9 +194,9 @@ export const actions: Actions = {
 				reason: String(form.get('reason') ?? ''),
 				actorUserId: user.id
 			});
-			return { success: true, message: `Transferred to ${t?.number}` };
+			return { success: true as const, message: `Transferred to ${t?.number}` };
 		} catch (e) {
-			return fail(400, { message: e instanceof Error ? e.message : 'Transfer failed' });
+			return actionFail(e, 'Transfer failed');
 		}
 	},
 	redirect: async ({ request, locals, params }) => {
@@ -163,17 +211,17 @@ export const actions: Actions = {
 				reason: String(form.get('reason') ?? ''),
 				actorUserId: user.id
 			});
-			return { success: true, message: `Redirected ${t?.number ?? ''}` };
+			return { success: true as const, message: `Redirected ${t?.number ?? ''}` };
 		} catch (e) {
-			return fail(400, { message: e instanceof Error ? e.message : 'Redirect failed' });
+			return actionFail(e, 'Redirect failed');
 		}
 	},
 	timeline: async ({ request, locals, params }) => {
 		await requireStaff(locals.user, params.businessId);
 		const form = await request.formData();
 		const ticketId = String(form.get('ticketId') ?? '');
-		if (!ticketId) return fail(400, { message: 'Ticket required' });
+		if (!ticketId) return fail(400, { message: 'Ticket required', success: false as const });
 		const events = await getTicketTimeline(ticketId);
-		return { success: true, events, ticketId, message: `Timeline (${events.length})` };
+		return { success: true as const, events, ticketId, message: `Timeline (${events.length})` };
 	}
 };

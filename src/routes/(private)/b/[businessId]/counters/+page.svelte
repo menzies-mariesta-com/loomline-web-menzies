@@ -1,12 +1,25 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { CircleCheck, CircleX, Pencil, Plus, RefreshCw, Trash2 } from '@lucide/svelte';
+	import {
+		CircleCheck,
+		CircleX,
+		DoorClosed,
+		DoorOpen,
+		Pause,
+		Pencil,
+		Plus,
+		RefreshCw,
+		Trash2
+	} from '@lucide/svelte';
 	import { washRecipes } from '@menzies-mariesta-com/menzies-design-wash-ui/core';
 	import { bindSubmitting } from '#lib/tool/form-submit';
 	import { shortDateTime } from '#lib/util/format';
 	import DataTableShell from '#lib/component/own/local/private/data-table/DataTableShell.svelte';
 	import SearchSelect from '#lib/component/own/local/private/SearchSelect.svelte';
+	import ToastDismissButton from '#lib/component/own/local/private/ToastDismissButton.svelte';
+	import IconActionTip from '#lib/component/wash/tooltip/IconActionTip.svelte';
+	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
 
 	let { data, form } = $props();
 
@@ -165,11 +178,7 @@
 				<CircleX class="h-5 w-5 shrink-0" aria-hidden="true" />
 			{/if}
 			<span>{form.message}</span>
-			<button
-				type="button"
-				class="btn btn-ghost btn-xs cursor-pointer"
-				onclick={() => (toastGone = true)}>Dismiss</button
-			>
+			<ToastDismissButton onclick={() => (toastGone = true)} />
 		</div>
 	</div>
 {/if}
@@ -177,8 +186,8 @@
 <div class="flex min-h-0 flex-1 flex-col">
 	<DataTableShell title="Counters" bind:bodyEl footerSummary={footerSummary}>
 		{#snippet headerActions()}
-			<div class="tooltip tooltip-bottom tooltip-secondary" data-tip="Refresh">
-				<button
+			<WashTooltip tooltipText="Refresh" className="tooltip-secondary">
+<button
 					type="button"
 					class="btn btn-ghost btn-square btn-sm btn-secondary"
 					class:cursor-pointer={!refreshing}
@@ -194,9 +203,9 @@
 						<RefreshCw class="size-4" aria-hidden="true" />
 					{/if}
 				</button>
-			</div>
-			<div class="tooltip tooltip-left tooltip-primary" data-tip="Add">
-				<button
+</WashTooltip>
+			<WashTooltip tooltipText="Add" className="tooltip-primary">
+<button
 					type="button"
 					class="btn btn-ghost btn-square btn-sm btn-primary cursor-pointer"
 					aria-label="Add"
@@ -204,7 +213,7 @@
 				>
 					<Plus class="size-4" aria-hidden="true" />
 				</button>
-			</div>
+</WashTooltip>
 		{/snippet}
 
 		<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
@@ -266,7 +275,7 @@
 						<tr>
 							<td>
 								<div class="flex flex-wrap items-center gap-0.5">
-									<div class="tooltip tooltip-secondary tooltip-right" data-tip="Edit">
+									<IconActionTip tip="Edit" tone="secondary">
 										<button
 											type="button"
 											class="btn btn-ghost btn-square btn-xs btn-secondary cursor-pointer"
@@ -275,8 +284,13 @@
 										>
 											<Pencil class="size-3.5" aria-hidden="true" />
 										</button>
-									</div>
-									{#each ['open', 'paused', 'closed'] as st}
+									</IconActionTip>
+
+									{#each [
+										{ st: 'open', tip: 'Set open', tone: 'success', Icon: DoorOpen },
+										{ st: 'paused', tip: 'Set paused', tone: 'warning', Icon: Pause },
+										{ st: 'closed', tip: 'Set closed', tone: 'secondary', Icon: DoorClosed }
+									] as { st, tip, tone, Icon }}
 										<form
 											method="POST"
 											action="?/setStatus"
@@ -284,17 +298,25 @@
 										>
 											<input type="hidden" name="id" value={c.id} />
 											<input type="hidden" name="status" value={st} />
-											<button
-												type="submit"
-												class="btn btn-xs cursor-pointer"
-												class:btn-primary={c.status === st}
-												class:loading={statusBusy === c.id}
-												disabled={statusBusy === c.id}
-												aria-busy={statusBusy === c.id}>{st}</button
-											>
+											<IconActionTip {tip} {tone}>
+												<button
+													type="submit"
+													class="btn btn-ghost btn-square btn-xs cursor-pointer"
+													class:btn-primary={c.status === st}
+													class:loading={statusBusy === c.id}
+													class:cursor-not-allowed={statusBusy === c.id}
+													disabled={statusBusy === c.id}
+													aria-busy={statusBusy === c.id}
+													aria-label={tip}
+												>
+													{#if statusBusy !== c.id}
+														<Icon class="size-3.5" aria-hidden="true" />
+													{/if}
+												</button>
+											</IconActionTip>
 										</form>
 									{/each}
-									<div class="tooltip tooltip-error tooltip-right" data-tip="Delete">
+									<IconActionTip tip="Delete" tone="error">
 										<button
 											type="button"
 											class="btn btn-ghost btn-square btn-xs btn-error cursor-pointer"
@@ -303,7 +325,8 @@
 										>
 											<Trash2 class="size-3.5" aria-hidden="true" />
 										</button>
-									</div>
+									</IconActionTip>
+
 								</div>
 							</td>
 							<td>{(safePage - 1) * pageSize + i + 1}</td>
