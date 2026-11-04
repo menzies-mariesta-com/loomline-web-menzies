@@ -8,10 +8,9 @@ import { sendTrialOtp, verifyAndConsumeTrialOtp } from '#lib/server/qms/trial-ot
 import { isTrialDuration } from '#lib/tool/plans';
 import { ORIGIN, TRIAL_REQUEST_INBOX } from '$app/env/private';
 
-const DEFAULT_INBOX = 'zarnihlawn@outlook.com';
-
-function trialInbox(): string {
-	return (TRIAL_REQUEST_INBOX ?? process.env.TRIAL_REQUEST_INBOX ?? DEFAULT_INBOX).trim() || DEFAULT_INBOX;
+function trialInbox(): string | null {
+	const inbox = (TRIAL_REQUEST_INBOX ?? process.env.TRIAL_REQUEST_INBOX ?? '').trim();
+	return inbox || null;
 }
 
 /** Trial OTP and request actions need a live server. SvelteKit refuses to prerender those pages. */
@@ -92,6 +91,20 @@ export const actions: Actions = {
 			})
 			.returning();
 
+		const inbox = trialInbox();
+		if (!inbox) {
+			console.warn(
+				'[pricing] TRIAL_REQUEST_INBOX unset; trial request saved without notification email.'
+			);
+			return {
+				success: true,
+				message:
+					'Your trial request was saved. Our team can see it in admin (notification inbox is not configured).',
+				otpSent: false,
+				requestId: row.id
+			};
+		}
+
 		const origin = (ORIGIN || 'http://localhost:4001').replace(/\/$/, '');
 		const adminUrl = `${origin}/admin/trials`;
 		const notify = trialRequestNotifyEmail({
@@ -106,7 +119,7 @@ export const actions: Actions = {
 		});
 
 		const mail = await sendEmail({
-			to: trialInbox(),
+			to: inbox,
 			...notify
 		});
 

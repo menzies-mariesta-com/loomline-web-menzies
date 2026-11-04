@@ -32,8 +32,7 @@ export const variables = defineEnvVars({
 	SMTP_PASS: { description: 'SMTP password.', ...optionalString },
 	SMTP_FROM: { description: 'SMTP from address.', ...optionalString },
 	TRIAL_REQUEST_INBOX: {
-		description:
-			'Inbox for pricing trial request notifications (default: zarnihlawn@outlook.com).',
+		description: 'Inbox for pricing trial request notifications.',
 		...optionalString
 	},
 	S3_ACCESS_KEY_ID: {

@@ -2,6 +2,10 @@
   command = "npm run build"
   publish = "build"
 
+[build.environment]
+  # Public config values appear in docs/examples; keep scanning for real secrets.
+  SECRETS_SCAN_OMIT_KEYS = "ORIGIN,ORG_IMAGE_BUCKET,TRIAL_REQUEST_INBOX,SEED_PLATFORM_ADMIN_EMAIL"
+
 [functions]
   node_bundler = "esbuild"
 
@@ -98,11 +102,6 @@
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
     Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
     Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; frame-ancestors 'self'"
-
-[[headers]]
-  for = "/_app/immutable/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
 
 [[headers]]
   for = "/og-nextup.png"
