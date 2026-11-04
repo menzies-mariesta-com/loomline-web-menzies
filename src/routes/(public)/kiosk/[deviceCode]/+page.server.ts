@@ -5,6 +5,8 @@ import { db } from '#lib/server/db';
 import { displayDevice, queue, business } from '#lib/server/db/schema';
 import { issueTicket } from '#lib/server/qms/ticket-machine';
 
+export const prerender = false;
+
 export const load: PageServerLoad = async ({ params }) => {
 	const device = await db.query.displayDevice.findFirst({
 		where: eq(displayDevice.pairingCode, params.deviceCode)

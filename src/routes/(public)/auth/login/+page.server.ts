@@ -8,6 +8,9 @@ import { user } from '#lib/server/db/schema';
 import { resolvePostLoginPath } from '#lib/server/qms/guards';
 import { enforceRateLimit } from '#lib/server/security/rate-limit';
 
+/** Sign-in is a form action, and the prerender crawl follows the marketing links here. */
+export const prerender = false;
+
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const requested = url.searchParams.get('redirectTo');
 	if (locals.user) {

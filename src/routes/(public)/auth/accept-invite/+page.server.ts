@@ -8,6 +8,8 @@ import { account, business, invite, membership, user } from '#lib/server/db/sche
 import { writeAudit } from '#lib/server/qms/audit';
 import { normalizeInviteToken } from '#lib/server/qms/email';
 
+export const prerender = false;
+
 export const load: PageServerLoad = async ({ url }) => {
 	const token = normalizeInviteToken(url.searchParams.get('token'));
 	if (!token) return { invite: null, error: 'Missing invite token.', businessName: null };
