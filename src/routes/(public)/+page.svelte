@@ -9,6 +9,7 @@
 	import HomeOmnichannel from '#lib/component/own/local/public/home/HomeOmnichannel.svelte';
 	import HomeCta from '#lib/component/own/local/public/home/HomeCta.svelte';
 	import HomeFooter from '#lib/component/own/local/public/home/HomeFooter.svelte';
+	import SeoHead from '#lib/component/own/local/public/SeoHead.svelte';
 	import { m } from '#lib/paraglide/messages';
 
 	let { data } = $props();
@@ -47,23 +48,17 @@
 	);
 </script>
 
-<svelte:head>
-	<title>{title}</title>
-	<meta name="description" content={description} />
-	<link rel="canonical" href="{canonical}/" />
-	<meta property="og:title" content={title} />
-	<meta property="og:description" content={description} />
-	<meta property="og:url" content="{canonical}/" />
-	<meta property="og:type" content="website" />
-	<meta property="og:site_name" content={m.brand_nextup()} />
-	<meta property="og:image" content={ogImage} />
-	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:title" content={title} />
-	<meta name="twitter:description" content={description} />
-	<meta name="twitter:image" content={ogImage} />
-	<link rel="preload" href={frauncesUrl} as="font" type="font/woff2" crossorigin="anonymous" />
-	{@html `<script type="application/ld+json">${jsonLd}</script>`}
-</svelte:head>
+<SeoHead
+	{title}
+	{description}
+	canonical="{canonical}/"
+	{ogImage}
+	pathname="/"
+	origin={canonical}
+	{jsonLd}
+	siteName={m.brand_nextup()}
+	preloadFontUrl={frauncesUrl}
+/>
 
 <div class="loom-marketing paper-grain min-h-screen">
 	<HomeNav />

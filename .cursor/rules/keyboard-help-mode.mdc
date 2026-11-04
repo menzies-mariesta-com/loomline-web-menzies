@@ -1,0 +1,8 @@
+---
+description: Alt keyboard help — KeyTips on each control (NextUp)
+alwaysApply: true
+---
+
+# Keyboard help mode (Alt)
+
+**No central shortcut panel.** Alt toggles **per-control KeyTips** (`WashShortcutBadge`, `WashActionKbd`, `ShortcutTarget`). Shortcuts run only while help is on (except Ctrl/Cmd+K). See developer doc **Keyboard help (Alt)** and `src/lib/component/own/local/keyboard/`.

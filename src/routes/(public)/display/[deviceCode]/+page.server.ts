@@ -13,7 +13,7 @@ import {
 	voiceProfile
 } from '#lib/server/db/schema';
 import { getSiteSnapshot } from '#lib/server/qms/ticket-machine';
-import { DEFAULT_VOICE_TEMPLATE } from '#lib/util/voice';
+import { buildAnnounceVoiceConfig } from '#lib/util/voice';
 
 async function resolveDepartmentName(opts: {
 	siteId: string;
@@ -87,9 +87,9 @@ export const load: PageServerLoad = async ({ params }) => {
 	]);
 
 	const counterMap = Object.fromEntries(counters.map((c) => [c.id, c.label]));
-	const templates = (voice?.templates ?? {}) as Record<string, string>;
 	const boundQueueIds = device.boundQueueIds ?? [];
 	const boundCounterIds = device.boundCounterIds ?? [];
+	const voiceConfig = buildAnnounceVoiceConfig(voice);
 
 	const departmentName = await resolveDepartmentName({
 		siteId: device.siteId,
@@ -97,11 +97,6 @@ export const load: PageServerLoad = async ({ params }) => {
 		boundQueueIds,
 		boundCounterIds
 	});
-
-	const announceLocales =
-		Array.isArray(voice?.announceLocales) && voice.announceLocales.length
-			? voice.announceLocales.map(String)
-			: [voice?.locale ?? 'en'];
 
 	return {
 		device,
@@ -111,9 +106,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		boundQueueIds,
 		snapshot,
 		counterMap,
-		voiceTemplate: templates.now_serving ?? DEFAULT_VOICE_TEMPLATE,
-		announceLocales,
-		announceRepeat: voice?.announceRepeat ?? 1,
+		voiceConfig,
 		siteId: device.siteId
 	};
 };

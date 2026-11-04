@@ -14,10 +14,17 @@
 	import { bindSubmitting } from '#lib/tool/form-submit';
 	import { shortDateTime } from '#lib/util/format';
 	import DataTableShell from '#lib/component/own/local/private/data-table/DataTableShell.svelte';
+	import { buildCrudRowActions } from '#lib/keyboard/table-actions';
+	import { clickRowActionButton } from '#lib/keyboard/click-row-action';
+
 	import SearchSelect from '#lib/component/own/local/private/SearchSelect.svelte';
 	import ToastDismissButton from '#lib/component/own/local/private/ToastDismissButton.svelte';
 	import IconActionTip from '#lib/component/wash/tooltip/IconActionTip.svelte';
 	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
+	import WashActionKbd from '#lib/component/own/local/keyboard/WashActionKbd.svelte';
+	import ShortcutTarget from '#lib/component/own/local/keyboard/ShortcutTarget.svelte';
+	import { registerDataTableHeaderShortcuts } from '#lib/keyboard/page-table-shortcuts';
+	import { m } from '#lib/paraglide/messages';
 
 	let { data, form } = $props();
 
@@ -61,15 +68,23 @@
 		data.timelines.filter((t) => {
 			const q = nameFilter.trim().toLowerCase();
 			return (
-				!q ||
-				t.name.toLowerCase().includes(q) ||
-				(t.service?.name ?? '').toLowerCase().includes(q)
+				!q || t.name.toLowerCase().includes(q) || (t.service?.name ?? '').toLowerCase().includes(q)
 			);
 		})
 	);
 	const totalPages = $derived(Math.max(1, Math.ceil(filtered.length / pageSize)));
 	const safePage = $derived(Math.min(page, totalPages));
 	const pageRows = $derived(filtered.slice((safePage - 1) * pageSize, safePage * pageSize));
+	let keyboardRowIndex = $state<number | null>(null);
+	const tableRowActions = $derived({
+		v: {
+			key: 'v',
+			label: m.keyboard_action_view(),
+			run: (row: TimelineRow) => clickRowActionButton(row.id, 'Steps')
+		},
+		...buildCrudRowActions({ onEdit: openEdit, onDelete: openDelete })
+	});
+
 	const showingFrom = $derived(filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1);
 	const showingTo = $derived(Math.min(safePage * pageSize, filtered.length));
 	const footerSummary = $derived(
@@ -140,6 +155,15 @@
 		addStepDestId = data.destinations[0]?.id ?? '';
 		stepsDialog?.showModal();
 	}
+
+	$effect(() => {
+		const off = registerDataTableHeaderShortcuts('timelines', {
+			onRefresh: () => void handleRefresh(),
+			refreshDisabled: () => refreshing,
+			onNew: openCreate
+		});
+		return off;
+	});
 </script>
 
 <svelte:head>
@@ -148,7 +172,7 @@
 </svelte:head>
 
 {#if form?.message && !toastGone}
-	<div class="toast toast-bottom toast-end z-[100]">
+	<div class="toast toast-end toast-bottom z-[100]">
 		<div
 			class="alert shadow-lg"
 			class:alert-success={form.success}
@@ -166,40 +190,52 @@
 {/if}
 
 <div class="flex min-h-0 flex-1 flex-col">
-	<DataTableShell title="Timelines" bind:bodyEl footerSummary={footerSummary}>
+	<DataTableShell
+		keyboardRows={pageRows}
+		rowActions={tableRowActions}
+		tableId="timelines"
+		bind:keyboardRowIndex
+		title="Timelines"
+		bind:bodyEl
+		{footerSummary}
+	>
 		{#snippet headerActions()}
 			<WashTooltip tooltipText="Refresh" className="tooltip-secondary">
-<button
-					type="button"
-					class="btn btn-ghost btn-square btn-sm btn-secondary"
-					class:cursor-pointer={!refreshing}
-					class:cursor-not-allowed={refreshing}
-					class:btn-disabled={refreshing}
-					class:loading={refreshing}
-					aria-label="Refresh"
-					aria-busy={refreshing}
-					disabled={refreshing}
-					onclick={() => void handleRefresh()}
-				>
-					{#if !refreshing}
-						<RefreshCw class="size-4" aria-hidden="true" />
-					{/if}
-				</button>
-</WashTooltip>
+				<ShortcutTarget keys={['R']} label={m.keyboard_action_refresh()}>
+					<button
+						type="button"
+						class="btn btn-square btn-ghost btn-secondary btn-sm"
+						class:cursor-pointer={!refreshing}
+						class:cursor-not-allowed={refreshing}
+						class:btn-disabled={refreshing}
+						class:loading={refreshing}
+						aria-label="Refresh"
+						aria-busy={refreshing}
+						disabled={refreshing}
+						onclick={() => void handleRefresh()}
+					>
+						{#if !refreshing}
+							<RefreshCw class="size-4" aria-hidden="true" />
+						{/if}
+					</button>
+				</ShortcutTarget>
+			</WashTooltip>
 			<WashTooltip tooltipText="Add" className="tooltip-primary">
-<button
-					type="button"
-					class="btn btn-ghost btn-square btn-sm btn-primary cursor-pointer"
-					aria-label="Add"
-					onclick={openCreate}
-				>
-					<Plus class="size-4" aria-hidden="true" />
-				</button>
-</WashTooltip>
+				<ShortcutTarget keys={['N']} label={m.keyboard_action_new()}>
+					<button
+						type="button"
+						class="btn btn-square cursor-pointer btn-ghost btn-primary btn-sm"
+						aria-label="Add"
+						onclick={openCreate}
+					>
+						<Plus class="size-4" aria-hidden="true" />
+					</button>
+				</ShortcutTarget>
+			</WashTooltip>
 		{/snippet}
 
-		<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
-			<thead class="bg-base-100 sticky top-0 z-10">
+		<table class="table w-full table-zebra [&_tbody_tr]:hover:bg-primary/40">
+			<thead class="sticky top-0 z-10 bg-base-100">
 				<tr>
 					<th>Actions</th>
 					<th>No</th>
@@ -216,7 +252,7 @@
 					<th>
 						<input
 							type="text"
-							class="input input-xs input-bordered w-full max-w-[10rem] cursor-text"
+							class="input-bordered input w-full max-w-[10rem] cursor-text input-xs"
 							placeholder="Filter…"
 							aria-label="Filter by name"
 							bind:value={nameFilter}
@@ -238,42 +274,51 @@
 					</tr>
 				{:else}
 					{#each pageRows as t, i (t.id)}
-						<tr>
+						<tr
+							data-kbd-row-id={t.id}
+							data-kbd-row-slot={String(i + 1)}
+							data-kbd-row-focus={keyboardRowIndex === i ? 'true' : undefined}
+						>
 							<td>
 								<div class="flex items-center gap-0.5">
-									<IconActionTip tip="Steps" tone="primary">
-<button
-											type="button"
-											class="btn btn-ghost btn-square btn-xs btn-primary cursor-pointer"
-											aria-label="Steps"
-											onclick={() => openSteps(t)}
-										>
-											<ListOrdered class="size-3.5" aria-hidden="true" />
-										</button>
-									</IconActionTip>
+									<WashActionKbd key="v">
+										<IconActionTip tip="Steps" tone="primary">
+											<button
+												type="button"
+												class="btn btn-square cursor-pointer btn-ghost btn-primary btn-xs"
+												aria-label="Steps"
+												onclick={() => openSteps(t)}
+											>
+												<ListOrdered class="size-3.5" aria-hidden="true" />
+											</button>
+										</IconActionTip>
+									</WashActionKbd>
 
-									<IconActionTip tip="Edit" tone="secondary">
-<button
-											type="button"
-											class="btn btn-ghost btn-square btn-xs btn-secondary cursor-pointer"
-											aria-label="Edit"
-											onclick={() => openEdit(t)}
-										>
-											<Pencil class="size-3.5" aria-hidden="true" />
-										</button>
-									</IconActionTip>
+									<WashActionKbd key="e">
+										<IconActionTip tip="Edit" tone="secondary">
+											<button
+												type="button"
+												class="btn btn-square cursor-pointer btn-ghost btn-secondary btn-xs"
+												aria-label="Edit"
+												onclick={() => openEdit(t)}
+											>
+												<Pencil class="size-3.5" aria-hidden="true" />
+											</button>
+										</IconActionTip>
+									</WashActionKbd>
 
-									<IconActionTip tip="Delete" tone="error">
-<button
-											type="button"
-											class="btn btn-ghost btn-square btn-xs btn-error cursor-pointer"
-											aria-label="Delete"
-											onclick={() => openDelete(t)}
-										>
-											<Trash2 class="size-3.5" aria-hidden="true" />
-										</button>
-									</IconActionTip>
-
+									<WashActionKbd key="d">
+										<IconActionTip tip="Delete" tone="error">
+											<button
+												type="button"
+												class="btn btn-square cursor-pointer btn-ghost btn-error btn-xs"
+												aria-label="Delete"
+												onclick={() => openDelete(t)}
+											>
+												<Trash2 class="size-3.5" aria-hidden="true" />
+											</button>
+										</IconActionTip>
+									</WashActionKbd>
 								</div>
 							</td>
 							<td>{(safePage - 1) * pageSize + i + 1}</td>
@@ -284,8 +329,7 @@
 								<span
 									class={t.isActive
 										? washRecipes.badgeSoft('success')
-										: washRecipes.badgeSoft('warning')}
-									>{t.isActive ? 'active' : 'inactive'}</span
+										: washRecipes.badgeSoft('warning')}>{t.isActive ? 'active' : 'inactive'}</span
 								>
 							</td>
 							<td>{shortDateTime(t.createdAt)}</td>
@@ -316,21 +360,21 @@
 			<div class="join">
 				<button
 					type="button"
-					class="btn btn-xs join-item cursor-pointer"
+					class="btn join-item cursor-pointer btn-xs"
 					disabled={safePage <= 1}
 					onclick={() => (page = safePage - 1)}>Prev</button
 				>
 				{#each pageButtons as p}
 					<button
 						type="button"
-						class="btn btn-xs join-item cursor-pointer"
+						class="btn join-item cursor-pointer btn-xs"
 						class:btn-active={p === safePage}
 						onclick={() => (page = p)}>{p}</button
 					>
 				{/each}
 				<button
 					type="button"
-					class="btn btn-xs join-item cursor-pointer"
+					class="btn join-item cursor-pointer btn-xs"
 					disabled={safePage >= totalPages}
 					onclick={() => (page = safePage + 1)}>Next</button
 				>
@@ -340,8 +384,8 @@
 </div>
 
 <dialog bind:this={createDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-lg border bg-base-100 shadow-sm">
-		<h2 class="card-title text-primary mb-4 font-bold">Add timeline</h2>
+	<div class="modal-box w-11/12 max-w-lg border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="mb-4 card-title font-bold text-primary">Add timeline</h2>
 		<form
 			method="POST"
 			action="?/create"
@@ -356,7 +400,7 @@
 		>
 			<label class="form-control w-full" for="tl-service">
 				<span class="label-text mb-1"
-					>Service<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span
+					>Service<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 					></span
 				>
 				<SearchSelect
@@ -369,10 +413,10 @@
 			</label>
 			<label class="form-control w-full" for="tl-name">
 				<span class="label-text mb-1"
-					>Name<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span
+					>Name<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 					></span
 				>
-				<input id="tl-name" name="name" class="input input-bordered w-full cursor-text" required />
+				<input id="tl-name" name="name" class="input-bordered input w-full cursor-text" required />
 			</label>
 			<div class="modal-action">
 				<button type="button" class="btn cursor-pointer" onclick={() => createDialog?.close()}
@@ -395,8 +439,8 @@
 </dialog>
 
 <dialog bind:this={editDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-lg border bg-base-100 shadow-sm">
-		<h2 class="card-title text-secondary mb-4 font-bold">Edit timeline</h2>
+	<div class="modal-box w-11/12 max-w-lg border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="mb-4 card-title font-bold text-secondary">Edit timeline</h2>
 		{#if editRow}
 			<form
 				method="POST"
@@ -413,7 +457,7 @@
 				<input type="hidden" name="id" value={editRow.id} />
 				<label class="form-control w-full" for="edit-tl-service">
 					<span class="label-text mb-1"
-						>Service<span class="text-error align-top text-sm leading-none" aria-hidden="true"
+						>Service<span class="align-top text-sm leading-none text-error" aria-hidden="true"
 							>*</span
 						></span
 					>
@@ -427,13 +471,13 @@
 				</label>
 				<label class="form-control w-full" for="edit-tl-name">
 					<span class="label-text mb-1"
-						>Name<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span
+						>Name<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 						></span
 					>
 					<input
 						id="edit-tl-name"
 						name="name"
-						class="input input-bordered w-full cursor-text"
+						class="input-bordered input w-full cursor-text"
 						value={editRow.name}
 						required
 					/>
@@ -469,8 +513,8 @@
 </dialog>
 
 <dialog bind:this={deleteDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-md border bg-base-100 shadow-sm">
-		<h2 class="card-title text-error mb-2 font-bold">Delete timeline</h2>
+	<div class="modal-box w-11/12 max-w-md border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="mb-2 card-title font-bold text-error">Delete timeline</h2>
 		<p class="text-sm opacity-70">Delete <strong>{deleteRow?.name}</strong> and its steps?</p>
 		{#if deleteRow}
 			<form
@@ -506,8 +550,8 @@
 </dialog>
 
 <dialog bind:this={stepsDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-2xl border bg-base-100 shadow-sm">
-		<h2 class="card-title text-primary mb-4 font-bold">
+	<div class="modal-box w-11/12 max-w-2xl border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="mb-4 card-title font-bold text-primary">
 			Steps: {stepsRow?.name ?? ''}
 		</h2>
 		{#if stepsRow}
@@ -532,23 +576,24 @@
 											use:enhance={bindSubmitting((v) => (stepBusy = v))}
 										>
 											<input type="hidden" name="id" value={step.id} />
-											<IconActionTip tip="Remove" tone="error">
-<button
-													type="submit"
-													class="btn btn-ghost btn-square btn-xs btn-error"
-													class:loading={stepBusy}
-													class:cursor-pointer={!stepBusy}
-													class:cursor-not-allowed={stepBusy}
-													disabled={stepBusy}
-													aria-busy={stepBusy}
-													aria-label="Remove"
-												>
-													{#if !stepBusy}
-														<Trash2 class="size-3.5" aria-hidden="true" />
-													{/if}
-												</button>
-											</IconActionTip>
-
+											<WashActionKbd key="d">
+												<IconActionTip tip="Remove" tone="error">
+													<button
+														type="submit"
+														class="btn btn-square btn-ghost btn-error btn-xs"
+														class:loading={stepBusy}
+														class:cursor-pointer={!stepBusy}
+														class:cursor-not-allowed={stepBusy}
+														disabled={stepBusy}
+														aria-busy={stepBusy}
+														aria-label="Remove"
+													>
+														{#if !stepBusy}
+															<Trash2 class="size-3.5" aria-hidden="true" />
+														{/if}
+													</button>
+												</IconActionTip>
+											</WashActionKbd>
 										</form>
 									</td>
 									<td>
@@ -563,19 +608,19 @@
 											<input
 												name="stepOrder"
 												type="number"
-												class="input input-xs input-bordered w-16 cursor-text"
+												class="input-bordered input w-16 cursor-text input-xs"
 												value={step.stepOrder}
 											/>
 											<input
 												name="slaMinutes"
 												type="number"
-												class="input input-xs input-bordered w-20 cursor-text"
+												class="input-bordered input w-20 cursor-text input-xs"
 												value={step.slaMinutes ?? ''}
 												placeholder="SLA"
 											/>
 											<button
 												type="submit"
-												class="btn btn-xs btn-secondary min-w-16"
+												class="btn min-w-16 btn-secondary btn-xs"
 												class:loading={stepBusy}
 												disabled={stepBusy}
 												aria-busy={stepBusy}
@@ -599,7 +644,7 @@
 				<form
 					method="POST"
 					action="?/addStep"
-					class="border-base-300 space-y-3 border-t pt-3"
+					class="space-y-3 border-t border-base-300 pt-3"
 					use:enhance={bindSubmitting((v) => (stepBusy = v))}
 				>
 					<input type="hidden" name="timelineId" value={stepsRow.id} />
@@ -607,7 +652,7 @@
 					<div class="grid gap-2 sm:grid-cols-3">
 						<label class="form-control" for="step-order">
 							<span class="label-text mb-1"
-								>Order<span class="text-error align-top text-sm leading-none" aria-hidden="true"
+								>Order<span class="align-top text-sm leading-none text-error" aria-hidden="true"
 									>*</span
 								></span
 							>
@@ -615,7 +660,7 @@
 								id="step-order"
 								name="stepOrder"
 								type="number"
-								class="input input-bordered cursor-text"
+								class="input-bordered input cursor-text"
 								value={(sortedSteps.at(-1)?.stepOrder ?? 0) + 1}
 								required
 							/>
@@ -623,7 +668,7 @@
 						<label class="form-control" for="step-dest">
 							<span class="label-text mb-1"
 								>Destination<span
-									class="text-error align-top text-sm leading-none"
+									class="align-top text-sm leading-none text-error"
 									aria-hidden="true">*</span
 								></span
 							>
@@ -641,7 +686,7 @@
 								id="step-sla"
 								name="slaMinutes"
 								type="number"
-								class="input input-bordered cursor-text"
+								class="input-bordered input cursor-text"
 							/>
 						</label>
 					</div>

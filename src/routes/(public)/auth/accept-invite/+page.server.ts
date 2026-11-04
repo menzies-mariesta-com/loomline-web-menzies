@@ -50,31 +50,29 @@ export const actions: Actions = {
 			return fail(400, { message: 'Invite invalid or expired.' });
 		}
 
-		let existingUser = await db.query.user.findFirst({ where: eq(user.email, inv.email) });
-		if (!existingUser) {
-			const userId = randomUUID();
-			const hashed = await hashPassword(password);
-			await db.insert(user).values({
-				id: userId,
-				name: nameFromEmail(inv.email),
-				email: inv.email,
-				emailVerified: true
+		const existingUserCheck = await db.query.user.findFirst({ where: eq(user.email, inv.email) });
+		if (existingUserCheck) {
+			return fail(400, {
+				message: 'An account with this email already exists. Use staff registration instead.'
 			});
-			await db.insert(account).values({
-				id: randomUUID(),
-				accountId: userId,
-				providerId: 'credential',
-				userId,
-				password: hashed
-			});
-			existingUser = await db.query.user.findFirst({ where: eq(user.email, inv.email) });
-		} else {
-			const hashed = await hashPassword(password);
-			await db
-				.update(account)
-				.set({ password: hashed })
-				.where(and(eq(account.userId, existingUser.id), eq(account.providerId, 'credential')));
 		}
+
+		const userId = randomUUID();
+		const hashed = await hashPassword(password);
+		await db.insert(user).values({
+			id: userId,
+			name: nameFromEmail(inv.email),
+			email: inv.email,
+			emailVerified: true
+		});
+		await db.insert(account).values({
+			id: randomUUID(),
+			accountId: userId,
+			providerId: 'credential',
+			userId,
+			password: hashed
+		});
+		const existingUser = await db.query.user.findFirst({ where: eq(user.email, inv.email) });
 
 		if (!existingUser) return fail(500, { message: 'Could not create account.' });
 

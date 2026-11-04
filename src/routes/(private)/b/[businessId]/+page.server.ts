@@ -26,8 +26,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		params.businessId
 	);
 	const role = member?.role ?? (member === null ? 'platform_admin' : 'guest');
-	const isStaff = ['platform_admin', 'business_owner', 'manager', 'counter_agent'].includes(role);
-	const canSetup = ['platform_admin', 'business_owner', 'manager'].includes(role);
+	const isStaff = ['platform_admin', 'business_owner', 'business_admin', 'manager', 'counter_agent'].includes(role);
+	const canSetup = ['platform_admin', 'business_owner', 'business_admin', 'manager'].includes(role);
 	const canAnalytics = canSetup;
 	const isCounterAgent = role === 'counter_agent';
 

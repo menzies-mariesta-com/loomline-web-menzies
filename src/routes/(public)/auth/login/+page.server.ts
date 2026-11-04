@@ -6,6 +6,7 @@ import { APIError } from 'better-auth/api';
 import { db } from '#lib/server/db';
 import { user } from '#lib/server/db/schema';
 import { resolvePostLoginPath } from '#lib/server/qms/guards';
+import { enforceRateLimit } from '#lib/server/security/rate-limit';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const requested = url.searchParams.get('redirectTo');
@@ -21,6 +22,16 @@ export const actions: Actions = {
 		const email = String(form.get('email') ?? '');
 		const password = String(form.get('password') ?? '');
 		const redirectTo = String(form.get('redirectTo') ?? '/workspaces');
+
+		const normalizedEmail = email.trim().toLowerCase();
+		if (normalizedEmail) {
+			await enforceRateLimit({
+				scope: 'login:email',
+				id: normalizedEmail,
+				limit: 3,
+				windowSeconds: 60
+			});
+		}
 
 		try {
 			await auth.api.signInEmail({

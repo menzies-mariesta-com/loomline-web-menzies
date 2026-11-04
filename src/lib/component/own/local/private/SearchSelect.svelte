@@ -22,6 +22,7 @@
 		mono?: boolean;
 		size?: 'md' | 'sm' | 'xs';
 		class?: string;
+		onSelect?: (value: string) => void;
 	};
 
 	let {
@@ -38,7 +39,8 @@
 		ariaLabel = 'Select option',
 		mono = false,
 		size = 'md',
-		class: className = ''
+		class: className = '',
+		onSelect
 	}: Props = $props();
 
 	let open = $state(false);
@@ -121,6 +123,7 @@
 	function selectValue(next: string) {
 		value = next;
 		closePanel();
+		onSelect?.(next);
 	}
 
 	function selectEmpty() {

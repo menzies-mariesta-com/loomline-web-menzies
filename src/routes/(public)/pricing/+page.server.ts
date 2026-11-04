@@ -14,6 +14,8 @@ function trialInbox(): string {
 	return (TRIAL_REQUEST_INBOX ?? process.env.TRIAL_REQUEST_INBOX ?? DEFAULT_INBOX).trim() || DEFAULT_INBOX;
 }
 
+export const prerender = true;
+
 export const load: PageServerLoad = async () => {
 	return {
 		origin: ORIGIN || 'http://localhost:4001'

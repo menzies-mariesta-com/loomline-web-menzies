@@ -36,21 +36,33 @@ export const variables = defineEnvVars({
 			'Inbox for pricing trial request notifications (default: zarnihlawn@outlook.com).',
 		...optionalString
 	},
-	AWS_ACCESS_KEY_ID: {
+	S3_ACCESS_KEY_ID: {
 		description: 'Neon Object Storage (S3) access key id.',
 		...optionalString
 	},
-	AWS_SECRET_ACCESS_KEY: {
+	S3_SECRET_ACCESS_KEY: {
 		description: 'Neon Object Storage (S3) secret access key.',
 		...optionalString
 	},
-	AWS_REGION: { description: 'Neon Object Storage region.', ...optionalString },
+	S3_REGION: { description: 'Neon Object Storage region.', ...optionalString },
 	AWS_ENDPOINT_URL_S3: {
 		description: 'Neon Object Storage S3 endpoint URL.',
 		...optionalString
 	},
 	ORG_IMAGE_BUCKET: {
 		description: 'S3 bucket name for org images (default: uploads).',
+		...optionalString
+	},
+	UPSTASH_REDIS_REST_URL: {
+		description: 'Upstash Redis REST URL (optional; in-memory cache when omitted).',
+		...optionalString
+	},
+	UPSTASH_REDIS_REST_TOKEN: {
+		description: 'Upstash Redis REST token.',
+		...optionalString
+	},
+	CACHE_DEBUG: {
+		description: 'Set to 1 to log cache hit/miss.',
 		...optionalString
 	}
 });

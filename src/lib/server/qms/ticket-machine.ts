@@ -7,12 +7,16 @@ import {
 	queue,
 	serviceTimeline,
 	serviceTimelineStep,
+	site,
 	ticket,
 	ticketEvent,
-	transfer
+	transfer,
+	voiceProfile
 } from '#lib/server/db/schema';
+import { buildAnnounceVoiceConfig } from '#lib/util/voice';
 import { enqueueNotification } from '#lib/server/qms/notify';
 import { formatTicketNumber, randomToken } from '#lib/server/qms/ids';
+import { withQueueIssueLock } from '#lib/server/cache/redis';
 
 export type TicketRow = typeof ticket.$inferSelect;
 
@@ -37,7 +41,13 @@ async function nextSequence(queueId: string): Promise<number> {
 	return (latest?.sequence ?? 0) + 1;
 }
 
-export async function issueTicket(input: IssueTicketInput) {
+export function isUniqueViolation(err: unknown): boolean {
+	if (!(err instanceof Error)) return false;
+	const msg = err.message.toLowerCase();
+	return msg.includes('unique') || msg.includes('duplicate') || msg.includes('23505');
+}
+
+async function issueTicketInner(input: IssueTicketInput) {
 	const q = await db.query.queue.findFirst({
 		where: eq(queue.id, input.queueId),
 		with: { service: true }
@@ -107,6 +117,20 @@ export async function issueTicket(input: IssueTicketInput) {
 	}
 
 	return created;
+}
+
+export async function issueTicket(input: IssueTicketInput) {
+	return withQueueIssueLock(input.queueId, async () => {
+		for (let attempt = 0; attempt < 3; attempt++) {
+			try {
+				return await issueTicketInner(input);
+			} catch (err) {
+				if (attempt < 2 && isUniqueViolation(err)) continue;
+				throw err;
+			}
+		}
+		throw new Error('Could not issue ticket');
+	});
 }
 
 async function writeEvent(
@@ -282,8 +306,14 @@ async function maybeFlagSlaBreaches(queueId: string, slaMinutes: number) {
 export async function recallTicket(ticketId: string, actorUserId: string) {
 	const existing = await db.query.ticket.findFirst({ where: eq(ticket.id, ticketId) });
 	if (!existing || existing.status !== 'called') throw new Error('Ticket not in called state');
-	await writeEvent(existing.id, existing.businessId, 'recalled', actorUserId, {});
-	return existing;
+	const [updated] = await db
+		.update(ticket)
+		.set({ calledAt: new Date() })
+		.where(and(eq(ticket.id, ticketId), eq(ticket.status, 'called')))
+		.returning();
+	if (!updated) throw new Error('Ticket not in called state');
+	await writeEvent(updated.id, updated.businessId, 'recalled', actorUserId, {});
+	return updated;
 }
 
 export async function startServing(ticketId: string, actorUserId: string) {
@@ -347,42 +377,46 @@ export async function transferTicket(opts: {
 	});
 	if (!target || !target.transferAllowed) throw new Error('Transfer not allowed');
 
-	const sequence = await nextSequence(target.id);
-	const prefix = target.service?.codePrefix ?? 'A';
+	return withQueueIssueLock(target.id, async () => {
+		const sequence = await nextSequence(target.id);
+		const prefix = target.service?.codePrefix ?? 'A';
 
-	await db.insert(transfer).values({
-		ticketId: existing.id,
-		businessId: existing.businessId,
-		fromQueueId: existing.queueId,
-		toQueueId: opts.toQueueId,
-		fromCounterId: existing.counterId,
-		toCounterId: opts.toCounterId ?? null,
-		reason: opts.reason ?? null,
-		actorUserId: opts.actorUserId
+		await db.insert(transfer).values({
+			ticketId: existing.id,
+			businessId: existing.businessId,
+			fromQueueId: existing.queueId,
+			toQueueId: opts.toQueueId,
+			fromCounterId: existing.counterId,
+			toCounterId: opts.toCounterId ?? null,
+			reason: opts.reason ?? null,
+			actorUserId: opts.actorUserId
+		});
+
+		const [updated] = await db
+			.update(ticket)
+			.set({
+				status: 'waiting',
+				queueId: opts.toQueueId,
+				counterId: opts.toCounterId ?? null,
+				number: formatTicketNumber(prefix, sequence),
+				sequence,
+				calledAt: null,
+				servedAt: null
+			})
+			.where(and(eq(ticket.id, existing.id), inArray(ticket.status, ['waiting', 'called', 'held', 'serving'])))
+			.returning();
+
+		if (!updated) throw new Error('Ticket was already updated — refresh and try again');
+
+		await writeEvent(existing.id, existing.businessId, 'transferred', opts.actorUserId, {
+			fromQueueId: existing.queueId,
+			toQueueId: opts.toQueueId,
+			reason: opts.reason
+		});
+		await writeEvent(existing.id, existing.businessId, 'waiting', opts.actorUserId, {});
+
+		return updated;
 	});
-
-	const [updated] = await db
-		.update(ticket)
-		.set({
-			status: 'waiting',
-			queueId: opts.toQueueId,
-			counterId: opts.toCounterId ?? null,
-			number: formatTicketNumber(prefix, sequence),
-			sequence,
-			calledAt: null,
-			servedAt: null
-		})
-		.where(eq(ticket.id, existing.id))
-		.returning();
-
-	await writeEvent(existing.id, existing.businessId, 'transferred', opts.actorUserId, {
-		fromQueueId: existing.queueId,
-		toQueueId: opts.toQueueId,
-		reason: opts.reason
-	});
-	await writeEvent(existing.id, existing.businessId, 'waiting', opts.actorUserId, {});
-
-	return updated;
 }
 
 /** Redirect ticket to a destination (department/counter/external) and optional next timeline step. */
@@ -441,46 +475,50 @@ export async function redirectTicket(opts: {
 	});
 	if (!target) throw new Error('Target queue not found');
 
-	const sequence = await nextSequence(target.id);
-	const prefix = target.service?.codePrefix ?? 'A';
+	return withQueueIssueLock(target.id, async () => {
+		const sequence = await nextSequence(target.id);
+		const prefix = target.service?.codePrefix ?? 'A';
 
-	await db.insert(transfer).values({
-		ticketId: existing.id,
-		businessId: existing.businessId,
-		fromQueueId: existing.queueId,
-		toQueueId,
-		fromCounterId: existing.counterId,
-		toCounterId,
-		reason: opts.reason ?? `Redirect to ${dest.name}`,
-		actorUserId: opts.actorUserId
-	});
+		await db.insert(transfer).values({
+			ticketId: existing.id,
+			businessId: existing.businessId,
+			fromQueueId: existing.queueId,
+			toQueueId,
+			fromCounterId: existing.counterId,
+			toCounterId,
+			reason: opts.reason ?? `Redirect to ${dest.name}`,
+			actorUserId: opts.actorUserId
+		});
 
-	const [updated] = await db
-		.update(ticket)
-		.set({
-			status: 'waiting',
-			queueId: toQueueId,
-			counterId: toCounterId,
+		const [updated] = await db
+			.update(ticket)
+			.set({
+				status: 'waiting',
+				queueId: toQueueId,
+				counterId: toCounterId,
+				destinationId: dest.id,
+				timelineStepId: opts.timelineStepId ?? null,
+				number: formatTicketNumber(prefix, sequence),
+				sequence,
+				calledAt: null,
+				servedAt: null
+			})
+			.where(and(eq(ticket.id, existing.id), inArray(ticket.status, ['waiting', 'called', 'held', 'serving'])))
+			.returning();
+
+		if (!updated) throw new Error('Ticket was already updated — refresh and try again');
+
+		await writeEvent(existing.id, existing.businessId, 'redirected', opts.actorUserId, {
 			destinationId: dest.id,
-			timelineStepId: opts.timelineStepId ?? null,
-			number: formatTicketNumber(prefix, sequence),
-			sequence,
-			calledAt: null,
-			servedAt: null
-		})
-		.where(eq(ticket.id, existing.id))
-		.returning();
+			destinationName: dest.name,
+			toQueueId,
+			timelineStepId: opts.timelineStepId,
+			reason: opts.reason
+		});
+		await writeEvent(existing.id, existing.businessId, 'waiting', opts.actorUserId, {});
 
-	await writeEvent(existing.id, existing.businessId, 'redirected', opts.actorUserId, {
-		destinationId: dest.id,
-		destinationName: dest.name,
-		toQueueId,
-		timelineStepId: opts.timelineStepId,
-		reason: opts.reason
+		return updated;
 	});
-	await writeEvent(existing.id, existing.businessId, 'waiting', opts.actorUserId, {});
-
-	return updated;
 }
 
 export async function getTicketTimeline(ticketId: string) {
@@ -510,6 +548,16 @@ export async function getQueueWaiting(queueId: string) {
 }
 
 export async function getSiteSnapshot(siteId: string) {
+	const siteRow = await db.query.site.findFirst({
+		where: eq(site.id, siteId),
+		columns: { businessId: true }
+	});
+	const voice = siteRow
+		? await db.query.voiceProfile.findFirst({
+				where: eq(voiceProfile.businessId, siteRow.businessId)
+			})
+		: null;
+
 	const queues = await db.query.queue.findMany({
 		where: and(eq(queue.siteId, siteId), eq(queue.isActive, true)),
 		with: { service: true }
@@ -550,6 +598,7 @@ export async function getSiteSnapshot(siteId: string) {
 		waiting,
 		waitingByQueue,
 		missed,
+		voice: buildAnnounceVoiceConfig(voice),
 		updatedAt: new Date().toISOString()
 	};
 }

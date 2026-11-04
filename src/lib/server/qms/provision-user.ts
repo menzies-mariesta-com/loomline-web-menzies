@@ -11,6 +11,48 @@ export type ProvisionedUser = {
 	created: boolean;
 };
 
+const EMAIL_EXISTS_MESSAGE = 'An account with this email already exists';
+
+/** Reject if a global user row already exists (Medora staff registration policy). */
+export async function assertEmailAvailable(email: string): Promise<void> {
+	const normalized = email.trim().toLowerCase();
+	if (!normalized) throw new Error('Email required');
+	const existing = await db.query.user.findFirst({ where: eq(user.email, normalized) });
+	if (existing) throw new Error(EMAIL_EXISTS_MESSAGE);
+}
+
+/** Create a new credential user; fails when email is already taken. */
+export async function createCredentialUser(opts: {
+	email: string;
+	password: string;
+	name?: string;
+}): Promise<ProvisionedUser> {
+	await assertEmailAvailable(opts.email);
+	const email = opts.email.trim().toLowerCase();
+	const password = opts.password;
+	if (!password || password.length < 8) {
+		throw new Error('Password must be at least 8 characters');
+	}
+	const hashed = await hashPassword(password);
+	const userId = randomUUID();
+	await db.insert(user).values({
+		id: userId,
+		name: opts.name?.trim() || email.split('@')[0] || 'User',
+		email,
+		emailVerified: true
+	});
+	await db.insert(account).values({
+		id: randomUUID(),
+		accountId: userId,
+		providerId: 'credential',
+		userId,
+		password: hashed
+	});
+	const row = await db.query.user.findFirst({ where: eq(user.email, email) });
+	if (!row) throw new Error('User create failed');
+	return { id: row.id, email: row.email, created: true };
+}
+
 /**
  * Create a credential user, or return an existing one.
  * When `password` is set and the user already exists, refresh the credential password.

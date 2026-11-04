@@ -1,22 +1,20 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import {
-		Ban,
-		CircleCheck,
-		CircleX,
-		Plus,
-		RefreshCw,
-		UserCheck
-	} from '@lucide/svelte';
+	import { Ban, CircleCheck, CircleX, Plus, RefreshCw, UserCheck } from '@lucide/svelte';
 	import { washRecipes } from '@menzies-mariesta-com/menzies-design-wash-ui/core';
 	import { bindSubmitting } from '#lib/tool/form-submit';
 	import { shortDateTime } from '#lib/util/format';
 	import DataTableShell from '#lib/component/own/local/private/data-table/DataTableShell.svelte';
+	import { buildCrudRowActions } from '#lib/keyboard/table-actions';
 	import SearchSelect from '#lib/component/own/local/private/SearchSelect.svelte';
 	import ToastDismissButton from '#lib/component/own/local/private/ToastDismissButton.svelte';
 	import IconActionTip from '#lib/component/wash/tooltip/IconActionTip.svelte';
 	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
+	import WashActionKbd from '#lib/component/own/local/keyboard/WashActionKbd.svelte';
+	import ShortcutTarget from '#lib/component/own/local/keyboard/ShortcutTarget.svelte';
+	import { registerDataTableHeaderShortcuts } from '#lib/keyboard/page-table-shortcuts';
+	import { m } from '#lib/paraglide/messages';
 
 	let { data, form } = $props();
 
@@ -65,10 +63,7 @@
 			const siteName = (a.site?.name ?? '').toLowerCase();
 			const serviceName = (a.service?.name ?? '').toLowerCase();
 			const guestOk =
-				!q ||
-				guestLabel.includes(q) ||
-				siteName.includes(q) ||
-				serviceName.includes(q);
+				!q || guestLabel.includes(q) || siteName.includes(q) || serviceName.includes(q);
 			const statusOk = !statusFilter || a.status === statusFilter;
 			return guestOk && statusOk;
 		})
@@ -135,6 +130,9 @@
 		cancelDialog?.showModal();
 	}
 
+	let keyboardRowIndex = $state<number | null>(null);
+	const tableRowActions = $derived(buildCrudRowActions({ onCancel: openCancel }));
+
 	function statusBadge(status: string) {
 		if (status === 'scheduled') return washRecipes.badgeSoft('info');
 		if (status === 'converted' || status === 'completed' || status === 'checked_in') {
@@ -147,6 +145,15 @@
 	function guestLabel(a: ApptRow) {
 		return a.guestName ?? a.phone ?? '-';
 	}
+
+	$effect(() => {
+		const off = registerDataTableHeaderShortcuts('appointments', {
+			onRefresh: () => void handleRefresh(),
+			refreshDisabled: () => refreshing,
+			onNew: openCreate
+		});
+		return off;
+	});
 </script>
 
 <svelte:head>
@@ -155,7 +162,7 @@
 </svelte:head>
 
 {#if form?.message && !toastGone}
-	<div class="toast toast-bottom toast-end z-[100]">
+	<div class="toast toast-end toast-bottom z-[100]">
 		<div
 			class="alert shadow-lg"
 			class:alert-success={form.success !== false}
@@ -173,40 +180,50 @@
 {/if}
 
 <div class="flex min-h-0 flex-1 flex-col">
-	<DataTableShell title="Appointments" bind:bodyEl footerSummary={footerSummary}>
+	<DataTableShell
+		title="Appointments"
+		bind:bodyEl
+		{footerSummary}
+		keyboardRows={pageRows}
+		rowActions={tableRowActions}
+		tableId="appointments"
+		bind:keyboardRowIndex
+	>
 		{#snippet headerActions()}
 			<WashTooltip tooltipText="Refresh" className="tooltip-secondary">
-<button
-					type="button"
-					class="btn btn-ghost btn-square btn-sm btn-secondary"
-					class:cursor-pointer={!refreshing}
-					class:cursor-not-allowed={refreshing}
-					class:btn-disabled={refreshing}
-					class:loading={refreshing}
-					aria-label="Refresh"
-					aria-busy={refreshing}
-					disabled={refreshing}
-					onclick={() => void handleRefresh()}
-				>
-					{#if !refreshing}
-						<RefreshCw class="size-4" aria-hidden="true" />
-					{/if}
-				</button>
-</WashTooltip>
+				<ShortcutTarget keys={['R']} label={m.keyboard_action_refresh()}>
+					<button
+						type="button"
+						class="btn btn-square btn-ghost btn-secondary btn-sm"
+						class:cursor-pointer={!refreshing}
+						class:cursor-not-allowed={refreshing}
+						class:btn-disabled={refreshing}
+						class:loading={refreshing}
+						aria-label="Refresh"
+						aria-busy={refreshing}
+						disabled={refreshing}
+						onclick={() => void handleRefresh()}
+					>
+						{#if !refreshing}
+							<RefreshCw class="size-4" aria-hidden="true" />
+						{/if}
+					</button>
+				</ShortcutTarget>
+			</WashTooltip>
 			<WashTooltip tooltipText="Book" className="tooltip-primary">
-<button
+				<button
 					type="button"
-					class="btn btn-ghost btn-square btn-sm btn-primary cursor-pointer"
+					class="btn btn-square cursor-pointer btn-ghost btn-primary btn-sm"
 					aria-label="Book"
 					onclick={openCreate}
 				>
 					<Plus class="size-4" aria-hidden="true" />
 				</button>
-</WashTooltip>
+			</WashTooltip>
 		{/snippet}
 
-		<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
-			<thead class="bg-base-100 sticky top-0 z-10">
+		<table class="table w-full table-zebra [&_tbody_tr]:hover:bg-primary/40">
+			<thead class="sticky top-0 z-10 bg-base-100">
 				<tr>
 					<th>Actions</th>
 					<th>No</th>
@@ -224,7 +241,7 @@
 					<th>
 						<input
 							type="text"
-							class="input input-xs input-bordered w-full max-w-[10rem] cursor-text"
+							class="input-bordered input w-full max-w-[10rem] cursor-text input-xs"
 							placeholder="Filter…"
 							aria-label="Filter by guest"
 							bind:value={guestFilter}
@@ -259,7 +276,11 @@
 					</tr>
 				{:else}
 					{#each pageRows as a, i (a.id)}
-						<tr>
+						<tr
+							data-kbd-row-id={a.id}
+							data-kbd-row-slot={String(i + 1)}
+							data-kbd-row-focus={keyboardRowIndex === i ? 'true' : undefined}
+						>
 							<td>
 								<div class="flex items-center gap-0.5">
 									{#if a.status === 'scheduled'}
@@ -272,9 +293,9 @@
 										>
 											<input type="hidden" name="id" value={a.id} />
 											<IconActionTip tip="Check in" tone="primary">
-<button
+												<button
 													type="submit"
-													class="btn btn-ghost btn-square btn-xs btn-primary"
+													class="btn btn-square btn-ghost btn-primary btn-xs"
 													class:loading={checkingInId === a.id}
 													disabled={checkingInId === a.id || cancellingId === a.id}
 													aria-busy={checkingInId === a.id}
@@ -287,19 +308,19 @@
 													{/if}
 												</button>
 											</IconActionTip>
-
 										</form>
-										<IconActionTip tip="Cancel" tone="error">
-<button
-												type="button"
-												class="btn btn-ghost btn-square btn-xs btn-error cursor-pointer"
-												aria-label="Cancel"
-												onclick={() => openCancel(a)}
-											>
-												<Ban class="size-3.5" aria-hidden="true" />
-											</button>
-										</IconActionTip>
-
+										<WashActionKbd key="x">
+											<IconActionTip tip="Cancel" tone="error">
+												<button
+													type="button"
+													class="btn btn-square cursor-pointer btn-ghost btn-error btn-xs"
+													aria-label="Cancel"
+													onclick={() => openCancel(a)}
+												>
+													<Ban class="size-3.5" aria-hidden="true" />
+												</button>
+											</IconActionTip>
+										</WashActionKbd>
 									{/if}
 								</div>
 							</td>
@@ -337,21 +358,21 @@
 			<div class="join">
 				<button
 					type="button"
-					class="btn btn-xs join-item cursor-pointer"
+					class="btn join-item cursor-pointer btn-xs"
 					disabled={safePage <= 1}
 					onclick={() => (page = safePage - 1)}>Prev</button
 				>
 				{#each pageButtons as p}
 					<button
 						type="button"
-						class="btn btn-xs join-item cursor-pointer"
+						class="btn join-item cursor-pointer btn-xs"
 						class:btn-active={p === safePage}
 						onclick={() => (page = p)}>{p}</button
 					>
 				{/each}
 				<button
 					type="button"
-					class="btn btn-xs join-item cursor-pointer"
+					class="btn join-item cursor-pointer btn-xs"
 					disabled={safePage >= totalPages}
 					onclick={() => (page = safePage + 1)}>Next</button
 				>
@@ -361,8 +382,8 @@
 </div>
 
 <dialog bind:this={createDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-lg border bg-base-100 shadow-sm">
-		<h2 class="card-title text-primary mb-4 font-bold">Book appointment</h2>
+	<div class="modal-box w-11/12 max-w-lg border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="mb-4 card-title font-bold text-primary">Book appointment</h2>
 		<form
 			method="POST"
 			action="?/create"
@@ -377,7 +398,7 @@
 		>
 			<label class="form-control w-full" for="appt-site">
 				<span class="label-text mb-1"
-					>Site<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span
+					>Site<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 					></span
 				>
 				<SearchSelect
@@ -392,7 +413,7 @@
 			</label>
 			<label class="form-control w-full" for="appt-service">
 				<span class="label-text mb-1"
-					>Service<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span
+					>Service<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 					></span
 				>
 				<SearchSelect
@@ -407,14 +428,14 @@
 			</label>
 			<label class="form-control w-full" for="appt-starts">
 				<span class="label-text mb-1"
-					>Starts<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span
+					>Starts<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 					></span
 				>
 				<input
 					id="appt-starts"
 					name="startsAt"
 					type="datetime-local"
-					class="input input-bordered w-full cursor-text"
+					class="input-bordered input w-full cursor-text"
 					bind:value={createStartsAt}
 					required
 				/>
@@ -424,7 +445,7 @@
 				<input
 					id="appt-guest"
 					name="guestName"
-					class="input input-bordered w-full cursor-text"
+					class="input-bordered input w-full cursor-text"
 					bind:value={createGuestName}
 					placeholder="Optional"
 				/>
@@ -434,7 +455,7 @@
 				<input
 					id="appt-phone"
 					name="phone"
-					class="input input-bordered w-full cursor-text"
+					class="input-bordered input w-full cursor-text"
 					bind:value={createPhone}
 					placeholder="Optional"
 				/>
@@ -445,7 +466,7 @@
 					id="appt-duration"
 					name="durationMinutes"
 					type="number"
-					class="input input-bordered w-full cursor-text"
+					class="input-bordered input w-full cursor-text"
 					bind:value={createDuration}
 					min="5"
 				/>
@@ -471,8 +492,8 @@
 </dialog>
 
 <dialog bind:this={cancelDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-md border bg-base-100 shadow-sm">
-		<h2 class="card-title text-error mb-2 font-bold">Cancel appointment</h2>
+	<div class="modal-box w-11/12 max-w-md border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="mb-2 card-title font-bold text-error">Cancel appointment</h2>
 		<p class="text-sm opacity-70">
 			Cancel appointment for <strong>{cancelRow ? guestLabel(cancelRow) : ''}</strong
 			>{#if cancelRow}
@@ -485,7 +506,7 @@
 				class="modal-action"
 				use:enhance={bindSubmitting(
 					(v) => {
-						cancellingId = v ? cancelRow?.id ?? null : null;
+						cancellingId = v ? (cancelRow?.id ?? null) : null;
 					},
 					async ({ result, update }) => {
 						await update();

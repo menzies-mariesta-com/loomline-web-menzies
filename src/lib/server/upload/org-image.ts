@@ -2,11 +2,11 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import {
-	AWS_ACCESS_KEY_ID,
 	AWS_ENDPOINT_URL_S3,
-	AWS_REGION,
-	AWS_SECRET_ACCESS_KEY,
-	ORG_IMAGE_BUCKET
+	ORG_IMAGE_BUCKET,
+	S3_ACCESS_KEY_ID,
+	S3_REGION,
+	S3_SECRET_ACCESS_KEY
 } from '$app/env/private';
 import { randomToken } from '#lib/server/qms/ids';
 
@@ -33,9 +33,9 @@ export function getOrgImageS3Config(): {
 	client: S3Client;
 	bucket: string;
 } | null {
-	const accessKeyId = envTrim(AWS_ACCESS_KEY_ID ?? process.env.AWS_ACCESS_KEY_ID);
-	const secretAccessKey = envTrim(AWS_SECRET_ACCESS_KEY ?? process.env.AWS_SECRET_ACCESS_KEY);
-	const region = envTrim(AWS_REGION ?? process.env.AWS_REGION) ?? 'us-east-2';
+	const accessKeyId = envTrim(S3_ACCESS_KEY_ID ?? process.env.S3_ACCESS_KEY_ID);
+	const secretAccessKey = envTrim(S3_SECRET_ACCESS_KEY ?? process.env.S3_SECRET_ACCESS_KEY);
+	const region = envTrim(S3_REGION ?? process.env.S3_REGION) ?? 'us-east-2';
 	const endpoint = envTrim(AWS_ENDPOINT_URL_S3 ?? process.env.AWS_ENDPOINT_URL_S3);
 	const bucket =
 		envTrim(ORG_IMAGE_BUCKET ?? process.env.ORG_IMAGE_BUCKET) ??
@@ -62,7 +62,7 @@ export function orgImageObjectKey(fileKey: string): string {
 
 /**
  * Persist an org logo/avatar.
- * Prefers Neon Object Storage (S3) when `AWS_*` + bucket are configured;
+ * Prefers Neon Object Storage (S3) when `S3_*` + bucket are configured;
  * falls back to Netlify Blobs, then local disk under `static/uploads/orgs/`.
  */
 export async function saveOrgImage(file: File): Promise<string | null> {
@@ -93,7 +93,7 @@ export async function saveOrgImage(file: File): Promise<string | null> {
 	}
 
 	console.warn(
-		'[org-image] Neon Object Storage not configured (need AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_ENDPOINT_URL_S3). Falling back to Netlify Blobs / disk.'
+		'[org-image] Neon Object Storage not configured (need S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, AWS_ENDPOINT_URL_S3). Falling back to Netlify Blobs / disk.'
 	);
 
 	try {

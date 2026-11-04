@@ -21,9 +21,9 @@
 	<meta name="robots" content="noindex,nofollow" />
 </svelte:head>
 
-<h2 class="card-title text-primary mb-3 font-bold">Guest portal</h2>
+<h2 class="mb-3 card-title font-bold text-primary">Guest portal</h2>
 {#if form?.message}
-	<div class="alert alert-success mb-3">
+	<div class="mb-3 alert alert-success">
 		<span>{form.message}</span>
 		{#if form.token}
 			<a class="link cursor-pointer" href={resolve(`/t/${form.token}`)}>Open ticket</a>
@@ -43,8 +43,8 @@
 			ariaLabel="Queue"
 		/>
 	</div>
-	<input name="phone" class="input input-bordered cursor-text" placeholder="Phone for SMS" />
-	<button type="submit" class="btn btn-primary cursor-pointer">Take number</button>
+	<input name="phone" class="input-bordered input cursor-text" placeholder="Phone for SMS" />
+	<button type="submit" class="btn cursor-pointer btn-primary">Take number</button>
 </form>
 
 <form method="POST" action="?/book" class="mb-6 flex flex-wrap gap-2" use:enhance>
@@ -70,9 +70,9 @@
 			ariaLabel="Service"
 		/>
 	</div>
-	<input name="startsAt" type="datetime-local" class="input input-bordered cursor-text" required />
-	<input name="phone" class="input input-bordered cursor-text" placeholder="Phone" />
-	<button type="submit" class="btn btn-secondary cursor-pointer">Book appointment</button>
+	<input name="startsAt" type="datetime-local" class="input-bordered input cursor-text" required />
+	<input name="phone" class="input-bordered input cursor-text" placeholder="Phone" />
+	<button type="submit" class="btn cursor-pointer btn-secondary">Book appointment</button>
 </form>
 
 <h3 class="font-semibold">My tickets</h3>

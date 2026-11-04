@@ -17,11 +17,18 @@
 	import { shortDateTime } from '#lib/util/format';
 	import { inDateRange } from '#lib/util/date-range';
 	import DataTableShell from '#lib/component/own/local/private/data-table/DataTableShell.svelte';
+	import { buildCrudRowActions } from '#lib/keyboard/table-actions';
+	import { clickRowActionButton } from '#lib/keyboard/click-row-action';
+
 	import DateRangeFilter from '#lib/component/own/local/private/data-table/DateRangeFilter.svelte';
 	import SearchSelect from '#lib/component/own/local/private/SearchSelect.svelte';
 	import ToastDismissButton from '#lib/component/own/local/private/ToastDismissButton.svelte';
 	import IconActionTip from '#lib/component/wash/tooltip/IconActionTip.svelte';
 	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
+	import WashActionKbd from '#lib/component/own/local/keyboard/WashActionKbd.svelte';
+	import ShortcutTarget from '#lib/component/own/local/keyboard/ShortcutTarget.svelte';
+	import { registerDataTableHeaderShortcuts } from '#lib/keyboard/page-table-shortcuts';
+	import { m } from '#lib/paraglide/messages';
 
 	let { data, form } = $props();
 
@@ -59,9 +66,7 @@
 	let createBusinessId = $state('');
 	let createRole = $state('manager');
 
-	const businessOptions = $derived(
-		data.businesses.map((b) => ({ value: b.id, label: b.name }))
-	);
+	const businessOptions = $derived(data.businesses.map((b) => ({ value: b.id, label: b.name })));
 
 	const pageSize = $derived(
 		pageSizeChoice === 'auto' ? autoPageSize : Math.max(1, Number(pageSizeChoice))
@@ -70,8 +75,7 @@
 	const filtered = $derived(
 		data.invites.filter((inv) => {
 			const emailOk =
-				!emailFilter.trim() ||
-				inv.email.toLowerCase().includes(emailFilter.trim().toLowerCase());
+				!emailFilter.trim() || inv.email.toLowerCase().includes(emailFilter.trim().toLowerCase());
 			const roleOk = !roleFilter || inv.role === roleFilter;
 			const statusOk = !statusFilter || inv.status === statusFilter;
 			const bizName = inv.business?.name ?? '';
@@ -87,6 +91,15 @@
 	const totalPages = $derived(Math.max(1, Math.ceil(filtered.length / pageSize)));
 	const safePage = $derived(Math.min(page, totalPages));
 	const pageRows = $derived(filtered.slice((safePage - 1) * pageSize, safePage * pageSize));
+	let keyboardRowIndex = $state<number | null>(null);
+	const tableRowActions = $derived(
+		buildCrudRowActions({
+			onDelete: openDelete,
+			onView: (row) => clickRowActionButton(row.id, 'Provision'),
+			onCancel: (row) => clickRowActionButton(row.id, 'Cancel')
+		})
+	);
+
 	const showingFrom = $derived(filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1);
 	const showingTo = $derived(Math.min(safePage * pageSize, filtered.length));
 	const footerSummary = $derived(
@@ -192,6 +205,15 @@
 		ro.observe(bodyEl);
 		return () => ro.disconnect();
 	});
+
+	$effect(() => {
+		const off = registerDataTableHeaderShortcuts('admin-invites', {
+			onRefresh: () => void handleRefresh(),
+			refreshDisabled: () => refreshing,
+			onNew: openCreate
+		});
+		return off;
+	});
 </script>
 
 <svelte:head>
@@ -201,7 +223,7 @@
 
 <div class="flex min-h-0 flex-1 flex-col">
 	{#if form?.message && !toastGone}
-		<div class="toast toast-bottom toast-end z-[100]">
+		<div class="toast toast-end toast-bottom z-[100]">
 			<div
 				class="alert shadow-lg"
 				class:alert-success={form.success}
@@ -218,40 +240,52 @@
 		</div>
 	{/if}
 
-	<DataTableShell title="Invites" bind:bodyEl footerSummary={footerSummary}>
+	<DataTableShell
+		keyboardRows={pageRows}
+		rowActions={tableRowActions}
+		tableId="admin-invites"
+		bind:keyboardRowIndex
+		title="Invites"
+		bind:bodyEl
+		{footerSummary}
+	>
 		{#snippet headerActions()}
 			<WashTooltip tooltipText="Refresh" className="tooltip-secondary">
-<button
-					type="button"
-					class="btn btn-ghost btn-square btn-sm btn-secondary"
-					class:cursor-pointer={!refreshing}
-					class:cursor-not-allowed={refreshing}
-					class:btn-disabled={refreshing}
-					class:loading={refreshing}
-					aria-label="Refresh"
-					aria-busy={refreshing}
-					disabled={refreshing}
-					onclick={() => void handleRefresh()}
-				>
-					{#if !refreshing}
-						<RefreshCw class="size-4" aria-hidden="true" />
-					{/if}
-				</button>
-</WashTooltip>
+				<ShortcutTarget keys={['R']} label={m.keyboard_action_refresh()}>
+					<button
+						type="button"
+						class="btn btn-square btn-ghost btn-secondary btn-sm"
+						class:cursor-pointer={!refreshing}
+						class:cursor-not-allowed={refreshing}
+						class:btn-disabled={refreshing}
+						class:loading={refreshing}
+						aria-label="Refresh"
+						aria-busy={refreshing}
+						disabled={refreshing}
+						onclick={() => void handleRefresh()}
+					>
+						{#if !refreshing}
+							<RefreshCw class="size-4" aria-hidden="true" />
+						{/if}
+					</button>
+				</ShortcutTarget>
+			</WashTooltip>
 			<WashTooltip tooltipText="Add" className="tooltip-primary">
-<button
-					type="button"
-					class="btn btn-ghost btn-square btn-sm btn-primary cursor-pointer"
-					aria-label="Add"
-					onclick={openCreate}
-				>
-					<Plus class="size-4" aria-hidden="true" />
-				</button>
-</WashTooltip>
+				<ShortcutTarget keys={['N']} label={m.keyboard_action_new()}>
+					<button
+						type="button"
+						class="btn btn-square cursor-pointer btn-ghost btn-primary btn-sm"
+						aria-label="Add"
+						onclick={openCreate}
+					>
+						<Plus class="size-4" aria-hidden="true" />
+					</button>
+				</ShortcutTarget>
+			</WashTooltip>
 		{/snippet}
 
-		<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
-			<thead class="bg-base-100 sticky top-0 z-10">
+		<table class="table w-full table-zebra [&_tbody_tr]:hover:bg-primary/40">
+			<thead class="sticky top-0 z-10 bg-base-100">
 				<tr>
 					<th>Actions</th>
 					<th>No</th>
@@ -268,7 +302,7 @@
 					<th>
 						<input
 							type="text"
-							class="input input-xs input-bordered w-full max-w-[10rem] cursor-text"
+							class="input-bordered input w-full max-w-[10rem] cursor-text input-xs"
 							placeholder="Filter…"
 							aria-label="Filter by email"
 							bind:value={emailFilter}
@@ -295,7 +329,7 @@
 					<th>
 						<input
 							type="text"
-							class="input input-xs input-bordered w-full max-w-[8rem] cursor-text"
+							class="input-bordered input w-full max-w-[8rem] cursor-text input-xs"
 							placeholder="Filter…"
 							aria-label="Filter by business"
 							bind:value={businessFilter}
@@ -336,7 +370,11 @@
 					</tr>
 				{:else}
 					{#each pageRows as inv, i (inv.id)}
-						<tr>
+						<tr
+							data-kbd-row-id={inv.id}
+							data-kbd-row-slot={String(i + 1)}
+							data-kbd-row-focus={keyboardRowIndex === i ? 'true' : undefined}
+						>
 							<td>
 								<div class="flex items-center gap-0.5">
 									{#if inv.status === 'pending'}
@@ -352,9 +390,9 @@
 										>
 											<input type="hidden" name="inviteId" value={inv.id} />
 											<IconActionTip tip="Resend" tone="secondary">
-<button
+												<button
 													type="submit"
-													class="btn btn-ghost btn-square btn-xs btn-secondary"
+													class="btn btn-square btn-ghost btn-secondary btn-xs"
 													class:cursor-pointer={busyId !== inv.id}
 													class:cursor-not-allowed={busyId === inv.id}
 													class:loading={busyId === inv.id}
@@ -367,18 +405,19 @@
 													{/if}
 												</button>
 											</IconActionTip>
-
 										</form>
-										<IconActionTip tip="Provision" tone="secondary">
-<button
-												type="button"
-												class="btn btn-ghost btn-square btn-xs btn-secondary cursor-pointer"
-												aria-label="Provision"
-												onclick={() => openProvision(inv.id, inv.email)}
-											>
-												<UserPlus class="size-3.5" aria-hidden="true" />
-											</button>
-										</IconActionTip>
+										<WashActionKbd key="v">
+											<IconActionTip tip="Provision" tone="secondary">
+												<button
+													type="button"
+													class="btn btn-square cursor-pointer btn-ghost btn-secondary btn-xs"
+													aria-label="Provision"
+													onclick={() => openProvision(inv.id, inv.email)}
+												>
+													<UserPlus class="size-3.5" aria-hidden="true" />
+												</button>
+											</IconActionTip>
+										</WashActionKbd>
 
 										<form
 											method="POST"
@@ -391,36 +430,38 @@
 											)}
 										>
 											<input type="hidden" name="inviteId" value={inv.id} />
-											<IconActionTip tip="Cancel" tone="warning">
-<button
-													type="submit"
-													class="btn btn-ghost btn-square btn-xs btn-warning"
-													class:cursor-pointer={busyId !== inv.id}
-													class:cursor-not-allowed={busyId === inv.id}
-													class:loading={busyId === inv.id}
-													disabled={busyId === inv.id}
-													aria-busy={busyId === inv.id}
-													aria-label="Cancel"
-												>
-													{#if busyId !== inv.id}
-														<Ban class="size-3.5" aria-hidden="true" />
-													{/if}
-												</button>
-											</IconActionTip>
-
+											<WashActionKbd key="x">
+												<IconActionTip tip="Cancel" tone="warning">
+													<button
+														type="submit"
+														class="btn btn-square btn-ghost btn-warning btn-xs"
+														class:cursor-pointer={busyId !== inv.id}
+														class:cursor-not-allowed={busyId === inv.id}
+														class:loading={busyId === inv.id}
+														disabled={busyId === inv.id}
+														aria-busy={busyId === inv.id}
+														aria-label="Cancel"
+													>
+														{#if busyId !== inv.id}
+															<Ban class="size-3.5" aria-hidden="true" />
+														{/if}
+													</button>
+												</IconActionTip>
+											</WashActionKbd>
 										</form>
 									{/if}
-									<IconActionTip tip="Delete" tone="error">
-<button
-											type="button"
-											class="btn btn-ghost btn-square btn-xs btn-error cursor-pointer"
-											aria-label="Delete"
-											onclick={() => openDelete(inv)}
-										>
-											<Trash2 class="size-3.5" aria-hidden="true" />
-										</button>
-									</IconActionTip>
-
+									<WashActionKbd key="d">
+										<IconActionTip tip="Delete" tone="error">
+											<button
+												type="button"
+												class="btn btn-square cursor-pointer btn-ghost btn-error btn-xs"
+												aria-label="Delete"
+												onclick={() => openDelete(inv)}
+											>
+												<Trash2 class="size-3.5" aria-hidden="true" />
+											</button>
+										</IconActionTip>
+									</WashActionKbd>
 								</div>
 							</td>
 							<td>{(safePage - 1) * pageSize + i + 1}</td>
@@ -429,7 +470,7 @@
 							<td>
 								{#if inv.business}
 									<a
-										class="link link-primary cursor-pointer text-sm"
+										class="link cursor-pointer text-sm link-primary"
 										href={resolve(`/b/${inv.business.id}`)}>{inv.business.name}</a
 									>
 								{:else}
@@ -437,10 +478,10 @@
 								{/if}
 							</td>
 							<td><span class={statusBadge(inv.status)}>{inv.status}</span></td>
-							<td class="text-ink-muted whitespace-nowrap text-sm"
+							<td class="text-ink-muted text-sm whitespace-nowrap"
 								>{shortDateTime(inv.expiresAt)}</td
 							>
-							<td class="text-ink-muted whitespace-nowrap text-sm"
+							<td class="text-ink-muted text-sm whitespace-nowrap"
 								>{shortDateTime(inv.createdAt)}</td
 							>
 						</tr>
@@ -474,7 +515,7 @@
 			<div class="join">
 				<button
 					type="button"
-					class="btn btn-sm join-item"
+					class="btn join-item btn-sm"
 					class:cursor-pointer={safePage > 1}
 					class:cursor-not-allowed={safePage <= 1}
 					disabled={safePage <= 1}
@@ -485,7 +526,7 @@
 				{#each pageButtons as p (p)}
 					<button
 						type="button"
-						class="btn btn-sm join-item cursor-pointer"
+						class="btn join-item cursor-pointer btn-sm"
 						class:btn-active={p === safePage}
 						onclick={() => (page = p)}
 					>
@@ -494,7 +535,7 @@
 				{/each}
 				<button
 					type="button"
-					class="btn btn-sm join-item"
+					class="btn join-item btn-sm"
 					class:cursor-pointer={safePage < totalPages}
 					class:cursor-not-allowed={safePage >= totalPages}
 					disabled={safePage >= totalPages}
@@ -508,34 +549,36 @@
 </div>
 
 <dialog bind:this={createDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-lg border bg-base-100 shadow-sm">
-		<h2 class="card-title text-primary font-bold">Create invite</h2>
+	<div class="modal-box w-11/12 max-w-lg border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="card-title font-bold text-primary">Create invite</h2>
 		<form
 			method="POST"
 			action="?/createInvite"
 			class="mt-4 flex flex-col gap-3"
-			use:enhance={bindSubmitting((v) => (creating = v), async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') closeCreate();
-			})}
+			use:enhance={bindSubmitting(
+				(v) => (creating = v),
+				async ({ result, update }) => {
+					await update();
+					if (result.type === 'success') closeCreate();
+				}
+			)}
 		>
 			<label class="form-control flex w-full flex-col" for="invite-email">
 				<span class="label-text mb-1">
-					Email<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span>
+					Email<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span>
 				</span>
 				<input
 					id="invite-email"
 					name="email"
 					type="email"
 					autocomplete="email"
-					class="input input-bordered w-full cursor-text"
+					class="input-bordered input w-full cursor-text"
 					required
 				/>
 			</label>
 			<label class="form-control flex w-full flex-col" for="invite-business">
 				<span class="label-text mb-1">
-					Business<span class="text-error align-top text-sm leading-none" aria-hidden="true"
-						>*</span
+					Business<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 					>
 				</span>
 				<SearchSelect
@@ -551,7 +594,7 @@
 			</label>
 			<label class="form-control flex w-full flex-col" for="invite-role">
 				<span class="label-text mb-1">
-					Role<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span>
+					Role<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span>
 				</span>
 				<SearchSelect
 					id="invite-role"
@@ -599,8 +642,8 @@
 </dialog>
 
 <dialog bind:this={provisionDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-md border bg-base-100 shadow-sm">
-		<h2 class="card-title text-secondary font-bold">Provision owner</h2>
+	<div class="modal-box w-11/12 max-w-md border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="card-title font-bold text-secondary">Provision owner</h2>
 		{#if provisionInviteId}
 			<p class="text-ink-muted mt-1 text-sm">{provisionEmail}</p>
 			<form
@@ -618,16 +661,15 @@
 				<input type="hidden" name="inviteId" value={provisionInviteId} />
 				<label class="form-control flex w-full flex-col" for="provision-password">
 					<span class="label-text mb-1">
-						Temp password<span
-							class="text-error align-top text-sm leading-none"
-							aria-hidden="true">*</span
+						Temp password<span class="align-top text-sm leading-none text-error" aria-hidden="true"
+							>*</span
 						>
 					</span>
 					<input
 						id="provision-password"
 						name="password"
 						type="text"
-						class="input input-bordered w-full cursor-text"
+						class="input-bordered input w-full cursor-text"
 						value="OwnerPass1!"
 						required
 					/>
@@ -665,21 +707,24 @@
 </dialog>
 
 <dialog bind:this={deleteDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-md border bg-base-100 shadow-sm">
-		<h2 class="card-title text-error font-bold">Delete invite</h2>
+	<div class="modal-box w-11/12 max-w-md border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="card-title font-bold text-error">Delete invite</h2>
 		{#if deleteRow}
 			<p class="text-ink-muted mt-2 text-sm">
 				Permanently delete the invite for
-				<span class="text-base-content font-medium">{deleteRow.email}</span>?
+				<span class="font-medium text-base-content">{deleteRow.email}</span>?
 			</p>
 			<form
 				method="POST"
 				action="?/deleteInvite"
 				class="modal-action justify-end"
-				use:enhance={bindSubmitting((v) => (deleting = v), async ({ result, update }) => {
-					await update();
-					if (result.type === 'success') closeDelete();
-				})}
+				use:enhance={bindSubmitting(
+					(v) => (deleting = v),
+					async ({ result, update }) => {
+						await update();
+						if (result.type === 'success') closeDelete();
+					}
+				)}
 			>
 				<input type="hidden" name="inviteId" value={deleteRow.id} />
 				<button

@@ -22,6 +22,20 @@
       "when": 1790600000000,
       "tag": "0002_voice_messaging_channels",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790700000000,
+      "tag": "0003_voice_locale_speech",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790800000000,
+      "tag": "0004_business_rbac",
+      "breakpoints": true
     }
   ]
 }

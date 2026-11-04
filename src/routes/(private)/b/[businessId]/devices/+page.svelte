@@ -20,10 +20,17 @@
 	import { bindSubmitting } from '#lib/tool/form-submit';
 	import { shortDateTime } from '#lib/util/format';
 	import DataTableShell from '#lib/component/own/local/private/data-table/DataTableShell.svelte';
+	import { buildCrudRowActions } from '#lib/keyboard/table-actions';
+	import { clickRowActionButton } from '#lib/keyboard/click-row-action';
+
 	import SearchSelect from '#lib/component/own/local/private/SearchSelect.svelte';
 	import ToastDismissButton from '#lib/component/own/local/private/ToastDismissButton.svelte';
 	import IconActionTip from '#lib/component/wash/tooltip/IconActionTip.svelte';
 	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
+	import WashActionKbd from '#lib/component/own/local/keyboard/WashActionKbd.svelte';
+	import ShortcutTarget from '#lib/component/own/local/keyboard/ShortcutTarget.svelte';
+	import { registerDataTableHeaderShortcuts } from '#lib/keyboard/page-table-shortcuts';
+	import { m } from '#lib/paraglide/messages';
 
 	let { data, form } = $props();
 
@@ -62,9 +69,7 @@
 	let editStationEmail = $state('');
 
 	const siteOptions = $derived(data.sites.map((s) => ({ value: s.id, label: s.name })));
-	const counterOptions = $derived(
-		data.counters.map((c) => ({ value: c.id, label: c.label }))
-	);
+	const counterOptions = $derived(data.counters.map((c) => ({ value: c.id, label: c.label })));
 	const typeOptions = [
 		{ value: 'tv', label: 'TV' },
 		{ value: 'kiosk', label: 'Kiosk' },
@@ -89,9 +94,7 @@
 				(d.site?.name ?? '').toLowerCase().includes(q) ||
 				(d.agentUser?.email ?? '').toLowerCase().includes(q);
 			const typeOk = !typeFilter || d.type === typeFilter;
-			const statusOk =
-				!statusFilter ||
-				(statusFilter === 'true' ? d.isActive : !d.isActive);
+			const statusOk = !statusFilter || (statusFilter === 'true' ? d.isActive : !d.isActive);
 			return nameOk && typeOk && statusOk;
 		})
 	);
@@ -99,6 +102,21 @@
 	const totalPages = $derived(Math.max(1, Math.ceil(filtered.length / pageSize)));
 	const safePage = $derived(Math.min(page, totalPages));
 	const pageRows = $derived(filtered.slice((safePage - 1) * pageSize, safePage * pageSize));
+	let keyboardRowIndex = $state<number | null>(null);
+
+	function openDevicePreview(row: DeviceRow) {
+		if (row.type === 'tv') clickRowActionButton(row.id, 'Open TV');
+		else if (row.type === 'kiosk') clickRowActionButton(row.id, 'Open kiosk');
+	}
+
+	const tableRowActions = $derived(
+		buildCrudRowActions({
+			onEdit: openEdit,
+			onDelete: openDelete,
+			onView: openDevicePreview
+		})
+	);
+
 	const showingFrom = $derived(filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1);
 	const showingTo = $derived(Math.min(safePage * pageSize, filtered.length));
 	const footerSummary = $derived(
@@ -179,6 +197,16 @@
 		if (type === 'agent') return 'Agent';
 		return type;
 	}
+
+	$effect(() => {
+		const off = registerDataTableHeaderShortcuts('devices', {
+			onRefresh: () => void handleRefresh(),
+			refreshDisabled: () => refreshing,
+			onNew: openCreate,
+			newLabel: 'Pair device'
+		});
+		return off;
+	});
 </script>
 
 <svelte:head>
@@ -187,7 +215,7 @@
 </svelte:head>
 
 {#if form?.message && !toastGone}
-	<div class="toast toast-bottom toast-end z-[100]">
+	<div class="toast toast-end toast-bottom z-[100]">
 		<div
 			class="alert shadow-lg"
 			class:alert-success={form.success}
@@ -209,41 +237,49 @@
 		title="Devices"
 		description="Pair TV and kiosk floor displays with a code. Agent desks use a dedicated station login (counter agent), not a public pairing link."
 		bind:bodyEl
-		footerSummary={footerSummary}
+		{footerSummary}
+		keyboardRows={pageRows}
+		rowActions={tableRowActions}
+		tableId="devices"
+		bind:keyboardRowIndex
 	>
 		{#snippet headerActions()}
 			<WashTooltip tooltipText="Refresh" className="tooltip-secondary">
-<button
-					type="button"
-					class="btn btn-ghost btn-square btn-sm btn-secondary"
-					class:cursor-pointer={!refreshing}
-					class:cursor-not-allowed={refreshing}
-					class:btn-disabled={refreshing}
-					class:loading={refreshing}
-					aria-label="Refresh"
-					aria-busy={refreshing}
-					disabled={refreshing}
-					onclick={() => void handleRefresh()}
-				>
-					{#if !refreshing}
-						<RefreshCw class="size-4" aria-hidden="true" />
-					{/if}
-				</button>
-</WashTooltip>
+				<ShortcutTarget keys={['R']} label={m.keyboard_action_refresh()}>
+					<button
+						type="button"
+						class="btn btn-square btn-ghost btn-secondary btn-sm"
+						class:cursor-pointer={!refreshing}
+						class:cursor-not-allowed={refreshing}
+						class:btn-disabled={refreshing}
+						class:loading={refreshing}
+						aria-label="Refresh"
+						aria-busy={refreshing}
+						disabled={refreshing}
+						onclick={() => void handleRefresh()}
+					>
+						{#if !refreshing}
+							<RefreshCw class="size-4" aria-hidden="true" />
+						{/if}
+					</button>
+				</ShortcutTarget>
+			</WashTooltip>
 			<WashTooltip tooltipText="Pair device" className="tooltip-primary">
-<button
-					type="button"
-					class="btn btn-ghost btn-square btn-sm btn-primary cursor-pointer"
-					aria-label="Pair device"
-					onclick={openCreate}
-				>
-					<Plus class="size-4" aria-hidden="true" />
-				</button>
-</WashTooltip>
+				<ShortcutTarget keys={['N']} label={m.keyboard_action_new()}>
+					<button
+						type="button"
+						class="btn btn-square cursor-pointer btn-ghost btn-primary btn-sm"
+						aria-label="Pair device"
+						onclick={openCreate}
+					>
+						<Plus class="size-4" aria-hidden="true" />
+					</button>
+				</ShortcutTarget>
+			</WashTooltip>
 		{/snippet}
 
-		<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
-			<thead class="bg-base-100 sticky top-0 z-10">
+		<table class="table w-full table-zebra [&_tbody_tr]:hover:bg-primary/40">
+			<thead class="sticky top-0 z-10 bg-base-100">
 				<tr>
 					<th>Actions</th>
 					<th>No</th>
@@ -262,7 +298,7 @@
 					<th>
 						<input
 							type="text"
-							class="input input-xs input-bordered w-full max-w-[10rem] cursor-text"
+							class="input-bordered input w-full max-w-[10rem] cursor-text input-xs"
 							placeholder="Filter…"
 							aria-label="Filter by name"
 							bind:value={nameFilter}
@@ -310,47 +346,55 @@
 					</tr>
 				{:else}
 					{#each pageRows as d, i (d.id)}
-						<tr>
+						<tr
+							data-kbd-row-id={d.id}
+							data-kbd-row-slot={String(i + 1)}
+							data-kbd-row-focus={keyboardRowIndex === i ? 'true' : undefined}
+						>
 							<td>
 								<div class="flex flex-wrap items-center gap-0.5">
 									{#if d.type === 'tv'}
-										<IconActionTip tip="Open TV" tone="primary">
-<a
-												class="btn btn-ghost btn-square btn-xs btn-primary cursor-pointer"
-												href={resolve(`/display/${d.pairingCode}`)}
-												target="_blank"
-												rel="noopener noreferrer"
-												aria-label="Open TV"
-											>
-												<Monitor class="size-3.5" aria-hidden="true" />
-											</a>
-										</IconActionTip>
-
+										<WashActionKbd key="v">
+											<IconActionTip tip="Open TV" tone="primary">
+												<a
+													class="btn btn-square cursor-pointer btn-ghost btn-primary btn-xs"
+													href={resolve(`/display/${d.pairingCode}`)}
+													target="_blank"
+													rel="noopener noreferrer"
+													aria-label="Open TV"
+												>
+													<Monitor class="size-3.5" aria-hidden="true" />
+												</a>
+											</IconActionTip>
+										</WashActionKbd>
 									{/if}
 									{#if d.type === 'kiosk'}
-										<IconActionTip tip="Open kiosk" tone="primary">
-<a
-												class="btn btn-ghost btn-square btn-xs btn-primary cursor-pointer"
-												href={resolve(`/kiosk/${d.pairingCode}`)}
-												target="_blank"
-												rel="noopener noreferrer"
-												aria-label="Open kiosk"
-											>
-												<Tablet class="size-3.5" aria-hidden="true" />
-											</a>
-										</IconActionTip>
-
+										<WashActionKbd key="v">
+											<IconActionTip tip="Open kiosk" tone="primary">
+												<a
+													class="btn btn-square cursor-pointer btn-ghost btn-primary btn-xs"
+													href={resolve(`/kiosk/${d.pairingCode}`)}
+													target="_blank"
+													rel="noopener noreferrer"
+													aria-label="Open kiosk"
+												>
+													<Tablet class="size-3.5" aria-hidden="true" />
+												</a>
+											</IconActionTip>
+										</WashActionKbd>
 									{/if}
-									<IconActionTip tip="Edit" tone="secondary">
-<button
-											type="button"
-											class="btn btn-ghost btn-square btn-xs btn-secondary cursor-pointer"
-											aria-label="Edit"
-											onclick={() => openEdit(d)}
-										>
-											<Pencil class="size-3.5" aria-hidden="true" />
-										</button>
-									</IconActionTip>
+									<WashActionKbd key="e">
+										<IconActionTip tip="Edit" tone="secondary">
+											<button
+												type="button"
+												class="btn btn-square cursor-pointer btn-ghost btn-secondary btn-xs"
+												aria-label="Edit"
+												onclick={() => openEdit(d)}
+											>
+												<Pencil class="size-3.5" aria-hidden="true" />
+											</button>
+										</IconActionTip>
+									</WashActionKbd>
 
 									{#if d.type !== 'agent'}
 										<form
@@ -360,9 +404,9 @@
 										>
 											<input type="hidden" name="id" value={d.id} />
 											<IconActionTip tip="New pairing code" tone="secondary">
-<button
+												<button
 													type="submit"
-													class="btn btn-ghost btn-square btn-xs btn-secondary"
+													class="btn btn-square btn-ghost btn-secondary btn-xs"
 													class:cursor-pointer={regeneratingId !== d.id}
 													class:cursor-not-allowed={regeneratingId === d.id}
 													class:btn-disabled={regeneratingId === d.id}
@@ -376,7 +420,6 @@
 													{/if}
 												</button>
 											</IconActionTip>
-
 										</form>
 									{/if}
 									{#if d.isActive}
@@ -387,9 +430,9 @@
 										>
 											<input type="hidden" name="id" value={d.id} />
 											<IconActionTip tip="Revoke" tone="error">
-<button
+												<button
 													type="submit"
-													class="btn btn-ghost btn-square btn-xs btn-error"
+													class="btn btn-square btn-ghost btn-error btn-xs"
 													class:cursor-pointer={revokingId !== d.id}
 													class:cursor-not-allowed={revokingId === d.id}
 													class:btn-disabled={revokingId === d.id}
@@ -403,7 +446,6 @@
 													{/if}
 												</button>
 											</IconActionTip>
-
 										</form>
 									{:else}
 										<form
@@ -413,9 +455,9 @@
 										>
 											<input type="hidden" name="id" value={d.id} />
 											<IconActionTip tip="Reactivate" tone="success">
-<button
+												<button
 													type="submit"
-													class="btn btn-ghost btn-square btn-xs btn-success"
+													class="btn btn-square btn-ghost btn-success btn-xs"
 													class:cursor-pointer={revokingId !== d.id}
 													class:cursor-not-allowed={revokingId === d.id}
 													class:btn-disabled={revokingId === d.id}
@@ -429,26 +471,26 @@
 													{/if}
 												</button>
 											</IconActionTip>
-
 										</form>
 									{/if}
-									<IconActionTip tip="Delete" tone="error">
-<button
-											type="button"
-											class="btn btn-ghost btn-square btn-xs btn-error cursor-pointer"
-											aria-label="Delete"
-											onclick={() => openDelete(d)}
-										>
-											<Trash2 class="size-3.5" aria-hidden="true" />
-										</button>
-									</IconActionTip>
-
+									<WashActionKbd key="d">
+										<IconActionTip tip="Delete" tone="error">
+											<button
+												type="button"
+												class="btn btn-square cursor-pointer btn-ghost btn-error btn-xs"
+												aria-label="Delete"
+												onclick={() => openDelete(d)}
+											>
+												<Trash2 class="size-3.5" aria-hidden="true" />
+											</button>
+										</IconActionTip>
+									</WashActionKbd>
 								</div>
 							</td>
 							<td>{(safePage - 1) * pageSize + i + 1}</td>
 							<td class="font-medium">{d.name}</td>
 							<td>
-								<span class="badge badge-ghost gap-1">
+								<span class="badge gap-1 badge-ghost">
 									{#if d.type === 'tv'}
 										<Monitor class="size-3" aria-hidden="true" />
 									{:else if d.type === 'kiosk'}
@@ -463,16 +505,13 @@
 							<td class="max-w-[12rem] truncate text-sm">
 								{#if d.type === 'agent'}
 									{#if d.agentUser?.email}
-										<span class="block truncate" title={d.agentUser.email}
-											>{d.agentUser.email}</span
+										<span class="block truncate" title={d.agentUser.email}>{d.agentUser.email}</span
 										>
 										{#if d.counterLabels.length}
-											<span class="text-ink-muted text-xs"
-												>{d.counterLabels.join(', ')}</span
-											>
+											<span class="text-ink-muted text-xs">{d.counterLabels.join(', ')}</span>
 										{/if}
 									{:else}
-										<span class="text-warning text-xs">No station account</span>
+										<span class="text-xs text-warning">No station account</span>
 									{/if}
 								{:else}
 									<span class="font-mono">{d.pairingCode}</span>
@@ -485,8 +524,7 @@
 								<span
 									class={d.isActive
 										? washRecipes.badgeSoft('success')
-										: washRecipes.badgeSoft('error')}
-									>{d.isActive ? 'active' : 'revoked'}</span
+										: washRecipes.badgeSoft('error')}>{d.isActive ? 'active' : 'revoked'}</span
 								>
 							</td>
 							<td>{shortDateTime(d.createdAt)}</td>
@@ -517,21 +555,21 @@
 			<div class="join">
 				<button
 					type="button"
-					class="btn btn-xs join-item cursor-pointer"
+					class="btn join-item cursor-pointer btn-xs"
 					disabled={safePage <= 1}
 					onclick={() => (page = safePage - 1)}>Prev</button
 				>
 				{#each pageButtons as p}
 					<button
 						type="button"
-						class="btn btn-xs join-item cursor-pointer"
+						class="btn join-item cursor-pointer btn-xs"
 						class:btn-active={p === safePage}
 						onclick={() => (page = p)}>{p}</button
 					>
 				{/each}
 				<button
 					type="button"
-					class="btn btn-xs join-item cursor-pointer"
+					class="btn join-item cursor-pointer btn-xs"
 					disabled={safePage >= totalPages}
 					onclick={() => (page = safePage + 1)}>Next</button
 				>
@@ -541,8 +579,8 @@
 </div>
 
 <dialog bind:this={createDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-lg border bg-base-100 shadow-sm">
-		<h2 class="card-title text-primary mb-4 font-bold">
+	<div class="modal-box w-11/12 max-w-lg border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="mb-4 card-title font-bold text-primary">
 			{createType === 'agent' ? 'Create agent station' : 'Pair device'}
 		</h2>
 		<form
@@ -559,19 +597,19 @@
 		>
 			<label class="form-control w-full" for="device-name">
 				<span class="label-text mb-1"
-					>Name<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span
+					>Name<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 					></span
 				>
 				<input
 					id="device-name"
 					name="name"
-					class="input input-bordered w-full cursor-text"
+					class="input-bordered input w-full cursor-text"
 					required
 				/>
 			</label>
 			<label class="form-control w-full" for="device-site">
 				<span class="label-text mb-1"
-					>Site<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span
+					>Site<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 					></span
 				>
 				<SearchSelect
@@ -585,7 +623,7 @@
 			</label>
 			<label class="form-control w-full" for="device-type">
 				<span class="label-text mb-1"
-					>Type<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span
+					>Type<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 					></span
 				>
 				<SearchSelect
@@ -597,23 +635,22 @@
 				/>
 			</label>
 			{#if createType === 'agent'}
-				<fieldset class="border-base-300 rounded-box border p-3">
+				<fieldset class="rounded-box border border-base-300 p-3">
 					<legend class="px-1 text-sm font-medium">Station account</legend>
 					<p class="text-ink-muted mb-2 text-xs">
 						Creates a counter agent login for this desk. They only see ticket calling after sign-in.
 					</p>
 					<label class="form-control w-full" for="device-station-email">
 						<span class="label-text mb-1"
-							>Email<span
-								class="text-error align-top text-sm leading-none"
-								aria-hidden="true">*</span
+							>Email<span class="align-top text-sm leading-none text-error" aria-hidden="true"
+								>*</span
 							></span
 						>
 						<input
 							id="device-station-email"
 							name="stationEmail"
 							type="email"
-							class="input input-bordered w-full cursor-text"
+							class="input-bordered input w-full cursor-text"
 							autocomplete="off"
 							bind:value={createStationEmail}
 							required
@@ -621,16 +658,15 @@
 					</label>
 					<label class="form-control mt-2 w-full" for="device-station-password">
 						<span class="label-text mb-1"
-							>Password<span
-								class="text-error align-top text-sm leading-none"
-								aria-hidden="true">*</span
+							>Password<span class="align-top text-sm leading-none text-error" aria-hidden="true"
+								>*</span
 							></span
 						>
 						<input
 							id="device-station-password"
 							name="stationPassword"
 							type="password"
-							class="input input-bordered w-full cursor-text"
+							class="input-bordered input w-full cursor-text"
 							autocomplete="new-password"
 							minlength="8"
 							required
@@ -651,7 +687,7 @@
 				</fieldset>
 			{/if}
 			{#if createType !== 'agent'}
-				<fieldset class="border-base-300 rounded-box border p-3">
+				<fieldset class="rounded-box border border-base-300 p-3">
 					<legend class="px-1 text-sm font-medium">Bound queues (optional)</legend>
 					<div class="flex max-h-40 flex-col gap-1 overflow-y-auto">
 						{#each data.queues as q}
@@ -700,8 +736,8 @@
 </dialog>
 
 <dialog bind:this={editDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-lg border bg-base-100 shadow-sm">
-		<h2 class="card-title text-secondary mb-4 font-bold">Edit device</h2>
+	<div class="modal-box w-11/12 max-w-lg border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="mb-4 card-title font-bold text-secondary">Edit device</h2>
 		{#if editRow}
 			<form
 				method="POST"
@@ -718,20 +754,20 @@
 				<input type="hidden" name="id" value={editRow.id} />
 				<label class="form-control w-full" for="edit-device-name">
 					<span class="label-text mb-1"
-						>Name<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span
+						>Name<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 						></span
 					>
 					<input
 						id="edit-device-name"
 						name="name"
-						class="input input-bordered w-full cursor-text"
+						class="input-bordered input w-full cursor-text"
 						value={editRow.name}
 						required
 					/>
 				</label>
 				<label class="form-control w-full" for="edit-device-site">
 					<span class="label-text mb-1"
-						>Site<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span
+						>Site<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 						></span
 					>
 					<SearchSelect
@@ -744,7 +780,7 @@
 				</label>
 				<label class="form-control w-full" for="edit-device-type">
 					<span class="label-text mb-1"
-						>Type<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span
+						>Type<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 						></span
 					>
 					<SearchSelect
@@ -765,7 +801,7 @@
 					/>
 				</label>
 				{#if editType === 'agent'}
-					<fieldset class="border-base-300 rounded-box border p-3">
+					<fieldset class="rounded-box border border-base-300 p-3">
 						<legend class="px-1 text-sm font-medium">Station account</legend>
 						{#if editRow.agentUser?.email}
 							<p class="text-ink-muted mb-2 text-xs">
@@ -773,14 +809,14 @@
 								. Leave password blank to keep the current password.
 							</p>
 						{:else}
-							<p class="text-warning mb-2 text-xs">
+							<p class="mb-2 text-xs text-warning">
 								No station account yet. Email and password are required.
 							</p>
 						{/if}
 						<label class="form-control w-full" for="edit-device-station-email">
 							<span class="label-text mb-1"
 								>Email{#if !editRow.agentUserId}<span
-										class="text-error align-top text-sm leading-none"
+										class="align-top text-sm leading-none text-error"
 										aria-hidden="true">*</span
 									>{/if}</span
 							>
@@ -788,7 +824,7 @@
 								id="edit-device-station-email"
 								name="stationEmail"
 								type="email"
-								class="input input-bordered w-full cursor-text"
+								class="input-bordered input w-full cursor-text"
 								autocomplete="off"
 								bind:value={editStationEmail}
 								required={!editRow.agentUserId}
@@ -797,7 +833,7 @@
 						<label class="form-control mt-2 w-full" for="edit-device-station-password">
 							<span class="label-text mb-1"
 								>Password{#if !editRow.agentUserId}<span
-										class="text-error align-top text-sm leading-none"
+										class="align-top text-sm leading-none text-error"
 										aria-hidden="true">*</span
 									>{/if}</span
 							>
@@ -805,7 +841,7 @@
 								id="edit-device-station-password"
 								name="stationPassword"
 								type="password"
-								class="input input-bordered w-full cursor-text"
+								class="input-bordered input w-full cursor-text"
 								autocomplete="new-password"
 								minlength="8"
 								required={!editRow.agentUserId}
@@ -829,7 +865,7 @@
 					<p class="text-ink-muted font-mono text-xs">
 						Pairing code: {editRow.pairingCode} (use New pairing code in the row to rotate)
 					</p>
-					<fieldset class="border-base-300 rounded-box border p-3">
+					<fieldset class="rounded-box border border-base-300 p-3">
 						<legend class="px-1 text-sm font-medium">Bound queues (optional)</legend>
 						<div class="flex max-h-40 flex-col gap-1 overflow-y-auto">
 							{#each data.queues as q}
@@ -879,8 +915,8 @@
 </dialog>
 
 <dialog bind:this={deleteDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-md border bg-base-100 shadow-sm">
-		<h2 class="card-title text-error mb-2 font-bold">Delete device</h2>
+	<div class="modal-box w-11/12 max-w-md border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="mb-2 card-title font-bold text-error">Delete device</h2>
 		<p class="text-sm opacity-70">
 			Delete <strong>{deleteRow?.name}</strong>? Pairing code
 			<span class="font-mono">{deleteRow?.pairingCode}</span> will stop working.

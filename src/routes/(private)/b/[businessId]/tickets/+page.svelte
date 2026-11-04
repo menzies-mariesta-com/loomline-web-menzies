@@ -5,9 +5,15 @@
 	import { washRecipes } from '@menzies-mariesta-com/menzies-design-wash-ui/core';
 	import { shortDateTime } from '#lib/util/format';
 	import DataTableShell from '#lib/component/own/local/private/data-table/DataTableShell.svelte';
+	import { buildCrudRowActions } from '#lib/keyboard/table-actions';
+	import { clickRowActionButton } from '#lib/keyboard/click-row-action';
 	import SearchSelect from '#lib/component/own/local/private/SearchSelect.svelte';
 	import IconActionTip from '#lib/component/wash/tooltip/IconActionTip.svelte';
 	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
+	import WashActionKbd from '#lib/component/own/local/keyboard/WashActionKbd.svelte';
+	import ShortcutTarget from '#lib/component/own/local/keyboard/ShortcutTarget.svelte';
+	import { registerDataTableHeaderShortcuts } from '#lib/keyboard/page-table-shortcuts';
+	import { m } from '#lib/paraglide/messages';
 
 	let { data } = $props();
 
@@ -58,6 +64,13 @@
 	const totalPages = $derived(Math.max(1, Math.ceil(filtered.length / pageSize)));
 	const safePage = $derived(Math.min(page, totalPages));
 	const pageRows = $derived(filtered.slice((safePage - 1) * pageSize, safePage * pageSize));
+
+	let keyboardRowIndex = $state<number | null>(null);
+	const tableRowActions = $derived(
+		buildCrudRowActions({
+			onView: (row) => clickRowActionButton(row.id, 'Open guest view')
+		})
+	);
 	const showingFrom = $derived(filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1);
 	const showingTo = $derived(Math.min(safePage * pageSize, filtered.length));
 	const footerSummary = $derived(
@@ -105,6 +118,14 @@
 		if (status === 'no_show' || status === 'cancelled') return washRecipes.badgeSoft('error');
 		return 'badge badge-ghost';
 	}
+
+	$effect(() => {
+		const off = registerDataTableHeaderShortcuts('tickets', {
+			onRefresh: () => void handleRefresh(),
+			refreshDisabled: () => refreshing
+		});
+		return off;
+	});
 </script>
 
 <svelte:head>
@@ -117,31 +138,37 @@
 		title="Tickets"
 		description="Recent tickets for this business (latest 200)."
 		bind:bodyEl
-		footerSummary={footerSummary}
+		{footerSummary}
+		keyboardRows={pageRows}
+		rowActions={tableRowActions}
+		tableId="tickets"
+		bind:keyboardRowIndex
 	>
 		{#snippet headerActions()}
 			<WashTooltip tooltipText="Refresh" className="tooltip-secondary">
-<button
-					type="button"
-					class="btn btn-ghost btn-square btn-sm btn-secondary"
-					class:cursor-pointer={!refreshing}
-					class:cursor-not-allowed={refreshing}
-					class:btn-disabled={refreshing}
-					class:loading={refreshing}
-					aria-label="Refresh"
-					aria-busy={refreshing}
-					disabled={refreshing}
-					onclick={() => void handleRefresh()}
-				>
-					{#if !refreshing}
-						<RefreshCw class="size-4" aria-hidden="true" />
-					{/if}
-				</button>
-</WashTooltip>
+				<ShortcutTarget keys={['R']} label={m.keyboard_action_refresh()}>
+					<button
+						type="button"
+						class="btn btn-square btn-ghost btn-secondary btn-sm"
+						class:cursor-pointer={!refreshing}
+						class:cursor-not-allowed={refreshing}
+						class:btn-disabled={refreshing}
+						class:loading={refreshing}
+						aria-label="Refresh"
+						aria-busy={refreshing}
+						disabled={refreshing}
+						onclick={() => void handleRefresh()}
+					>
+						{#if !refreshing}
+							<RefreshCw class="size-4" aria-hidden="true" />
+						{/if}
+					</button>
+				</ShortcutTarget>
+			</WashTooltip>
 		{/snippet}
 
-		<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
-			<thead class="bg-base-100 sticky top-0 z-10">
+		<table class="table w-full table-zebra [&_tbody_tr]:hover:bg-primary/40">
+			<thead class="sticky top-0 z-10 bg-base-100">
 				<tr>
 					<th>Actions</th>
 					<th>No</th>
@@ -158,7 +185,7 @@
 					<th>
 						<input
 							type="text"
-							class="input input-xs input-bordered w-full max-w-[8rem] cursor-text font-mono"
+							class="input-bordered input w-full max-w-[8rem] cursor-text font-mono input-xs"
 							placeholder="Filter…"
 							aria-label="Filter by number"
 							bind:value={numberFilter}
@@ -204,21 +231,26 @@
 					</tr>
 				{:else}
 					{#each pageRows as t, i (t.id)}
-						<tr>
+						<tr
+							data-kbd-row-id={t.id}
+							data-kbd-row-slot={String(i + 1)}
+							data-kbd-row-focus={keyboardRowIndex === i ? 'true' : undefined}
+						>
 							<td>
 								<div class="flex items-center gap-0.5">
-									<IconActionTip tip="Open guest view" tone="primary">
-<a
-											class="btn btn-ghost btn-square btn-xs btn-primary cursor-pointer"
-											href={resolve(`/t/${t.publicToken}`)}
-											target="_blank"
-											rel="noopener noreferrer"
-											aria-label="Open guest view"
-										>
-											<ExternalLink class="size-3.5" aria-hidden="true" />
-										</a>
-									</IconActionTip>
-
+									<WashActionKbd key="v">
+										<IconActionTip tip="Open guest view" tone="primary">
+											<a
+												class="btn btn-square cursor-pointer btn-ghost btn-primary btn-xs"
+												href={resolve(`/t/${t.publicToken}`)}
+												target="_blank"
+												rel="noopener noreferrer"
+												aria-label="Open guest view"
+											>
+												<ExternalLink class="size-3.5" aria-hidden="true" />
+											</a>
+										</IconActionTip>
+									</WashActionKbd>
 								</div>
 							</td>
 							<td>{(safePage - 1) * pageSize + i + 1}</td>
@@ -256,21 +288,21 @@
 			<div class="join">
 				<button
 					type="button"
-					class="btn btn-xs join-item cursor-pointer"
+					class="btn join-item cursor-pointer btn-xs"
 					disabled={safePage <= 1}
 					onclick={() => (page = safePage - 1)}>Prev</button
 				>
 				{#each pageButtons as p}
 					<button
 						type="button"
-						class="btn btn-xs join-item cursor-pointer"
+						class="btn join-item cursor-pointer btn-xs"
 						class:btn-active={p === safePage}
 						onclick={() => (page = p)}>{p}</button
 					>
 				{/each}
 				<button
 					type="button"
-					class="btn btn-xs join-item cursor-pointer"
+					class="btn join-item cursor-pointer btn-xs"
 					disabled={safePage >= totalPages}
 					onclick={() => (page = safePage + 1)}>Next</button
 				>

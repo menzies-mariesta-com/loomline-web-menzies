@@ -79,6 +79,18 @@ TV displays use this endpoint (SSE plus a short poll fallback).
 | Key | Pattern like `org-…-….jpg` / `.png` / `.webp` / `.gif` |
 | Cache | Long `Cache-Control` with stale-while-revalidate |
 
+## CDN and cache behavior (Netlify)
+
+| Surface | Cache |
+|---|---|
+| Marketing `/`, `/pricing`, `/docs/*`, `/privacy`, `/terms` | Anonymous HTML: `public, s-maxage=3600, stale-while-revalidate=86400` when no session cookie |
+| `/_app/immutable/*` | Immutable assets (1 year) |
+| `/api/realtime/site/*` | `no-cache` (live queue state) |
+| Authenticated `/b/*`, `/auth/*` | `private, no-store` + `Vary: Cookie` |
+| RBAC console paths | Redis cache-aside (~90s) with version bump on staff/group/bootstrap mutations |
+
+Set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` in production for cross-instance cache, rate limits, ticket queue locks, and cron idempotency. Without Redis, the app falls back to in-process memory (single instance only).
+
 ## Auth HTTP
 
 better-auth also mounts its usual `/api/auth/*` handlers for the product session. Integrators should use the documented login UI, not treat that surface as a QMS API.

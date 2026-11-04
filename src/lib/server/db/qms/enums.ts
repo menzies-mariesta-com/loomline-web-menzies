@@ -3,6 +3,7 @@ import { pgEnum } from 'drizzle-orm/pg-core';
 export const membershipRoleEnum = pgEnum('membership_role', [
 	'platform_admin',
 	'business_owner',
+	'business_admin',
 	'manager',
 	'counter_agent',
 	'guest'

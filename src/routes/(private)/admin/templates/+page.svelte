@@ -6,11 +6,17 @@
 	import { shortDateTime } from '#lib/util/format';
 	import { inDateRange } from '#lib/util/date-range';
 	import DataTableShell from '#lib/component/own/local/private/data-table/DataTableShell.svelte';
+	import { buildCrudRowActions } from '#lib/keyboard/table-actions';
+
 	import DateRangeFilter from '#lib/component/own/local/private/data-table/DateRangeFilter.svelte';
 	import SearchSelect from '#lib/component/own/local/private/SearchSelect.svelte';
 	import ToastDismissButton from '#lib/component/own/local/private/ToastDismissButton.svelte';
 	import IconActionTip from '#lib/component/wash/tooltip/IconActionTip.svelte';
 	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
+	import WashActionKbd from '#lib/component/own/local/keyboard/WashActionKbd.svelte';
+	import ShortcutTarget from '#lib/component/own/local/keyboard/ShortcutTarget.svelte';
+	import { registerDataTableHeaderShortcuts } from '#lib/keyboard/page-table-shortcuts';
+	import { m } from '#lib/paraglide/messages';
 
 	type TemplateRow = {
 		id: string;
@@ -68,6 +74,9 @@
 	const totalPages = $derived(Math.max(1, Math.ceil(filtered.length / pageSize)));
 	const safePage = $derived(Math.min(page, totalPages));
 	const pageRows = $derived(filtered.slice((safePage - 1) * pageSize, safePage * pageSize));
+	let keyboardRowIndex = $state<number | null>(null);
+	const tableRowActions = $derived(buildCrudRowActions({ onEdit: openEdit }));
+
 	const showingFrom = $derived(filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1);
 	const showingTo = $derived(Math.min(safePage * pageSize, filtered.length));
 	const footerSummary = $derived(
@@ -149,6 +158,15 @@
 		ro.observe(bodyEl);
 		return () => ro.disconnect();
 	});
+
+	$effect(() => {
+		const off = registerDataTableHeaderShortcuts('admin-templates', {
+			onRefresh: () => void handleRefresh(),
+			refreshDisabled: () => refreshing,
+			onNew: openCreate
+		});
+		return off;
+	});
 </script>
 
 <svelte:head>
@@ -158,7 +176,7 @@
 
 <div class="flex min-h-0 flex-1 flex-col">
 	{#if form?.message && !toastGone}
-		<div class="toast toast-bottom toast-end z-[100]">
+		<div class="toast toast-end toast-bottom z-[100]">
 			<div
 				class="alert shadow-lg"
 				class:alert-success={form.success}
@@ -175,40 +193,52 @@
 		</div>
 	{/if}
 
-	<DataTableShell title="Templates" bind:bodyEl footerSummary={footerSummary}>
+	<DataTableShell
+		keyboardRows={pageRows}
+		rowActions={tableRowActions}
+		tableId="admin-templates"
+		bind:keyboardRowIndex
+		title="Templates"
+		bind:bodyEl
+		{footerSummary}
+	>
 		{#snippet headerActions()}
 			<WashTooltip tooltipText="Refresh" className="tooltip-secondary">
-<button
-					type="button"
-					class="btn btn-ghost btn-square btn-sm btn-secondary"
-					class:cursor-pointer={!refreshing}
-					class:cursor-not-allowed={refreshing}
-					class:btn-disabled={refreshing}
-					class:loading={refreshing}
-					aria-label="Refresh"
-					aria-busy={refreshing}
-					disabled={refreshing}
-					onclick={() => void handleRefresh()}
-				>
-					{#if !refreshing}
-						<RefreshCw class="size-4" aria-hidden="true" />
-					{/if}
-				</button>
-</WashTooltip>
+				<ShortcutTarget keys={['R']} label={m.keyboard_action_refresh()}>
+					<button
+						type="button"
+						class="btn btn-square btn-ghost btn-secondary btn-sm"
+						class:cursor-pointer={!refreshing}
+						class:cursor-not-allowed={refreshing}
+						class:btn-disabled={refreshing}
+						class:loading={refreshing}
+						aria-label="Refresh"
+						aria-busy={refreshing}
+						disabled={refreshing}
+						onclick={() => void handleRefresh()}
+					>
+						{#if !refreshing}
+							<RefreshCw class="size-4" aria-hidden="true" />
+						{/if}
+					</button>
+				</ShortcutTarget>
+			</WashTooltip>
 			<WashTooltip tooltipText="Add" className="tooltip-primary">
-<button
-					type="button"
-					class="btn btn-ghost btn-square btn-sm btn-primary cursor-pointer"
-					aria-label="Add"
-					onclick={openCreate}
-				>
-					<Plus class="size-4" aria-hidden="true" />
-				</button>
-</WashTooltip>
+				<ShortcutTarget keys={['N']} label={m.keyboard_action_new()}>
+					<button
+						type="button"
+						class="btn btn-square cursor-pointer btn-ghost btn-primary btn-sm"
+						aria-label="Add"
+						onclick={openCreate}
+					>
+						<Plus class="size-4" aria-hidden="true" />
+					</button>
+				</ShortcutTarget>
+			</WashTooltip>
 		{/snippet}
 
-		<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
-			<thead class="bg-base-100 sticky top-0 z-10">
+		<table class="table w-full table-zebra [&_tbody_tr]:hover:bg-primary/40">
+			<thead class="sticky top-0 z-10 bg-base-100">
 				<tr>
 					<th>Actions</th>
 					<th>No</th>
@@ -224,7 +254,7 @@
 					<th>
 						<input
 							type="text"
-							class="input input-xs input-bordered w-full max-w-[10rem] cursor-text"
+							class="input-bordered input w-full max-w-[10rem] cursor-text input-xs"
 							placeholder="Filter…"
 							aria-label="Filter by name"
 							bind:value={nameFilter}
@@ -233,7 +263,7 @@
 					<th>
 						<input
 							type="text"
-							class="input input-xs input-bordered w-full max-w-[8rem] cursor-text"
+							class="input-bordered input w-full max-w-[8rem] cursor-text input-xs"
 							placeholder="Filter…"
 							aria-label="Filter by slug"
 							bind:value={slugFilter}
@@ -257,19 +287,24 @@
 					</tr>
 				{:else}
 					{#each pageRows as t, i (t.id)}
-						<tr>
+						<tr
+							data-kbd-row-id={t.id}
+							data-kbd-row-slot={String(i + 1)}
+							data-kbd-row-focus={keyboardRowIndex === i ? 'true' : undefined}
+						>
 							<td>
-								<IconActionTip tip="Edit" tone="secondary">
-<button
-										type="button"
-										class="btn btn-ghost btn-square btn-xs btn-secondary cursor-pointer"
-										aria-label="Edit"
-										onclick={() => openEdit(t)}
-									>
-										<Pencil class="size-3.5" aria-hidden="true" />
-									</button>
-								</IconActionTip>
-
+								<WashActionKbd key="e">
+									<IconActionTip tip="Edit" tone="secondary">
+										<button
+											type="button"
+											class="btn btn-square cursor-pointer btn-ghost btn-secondary btn-xs"
+											aria-label="Edit"
+											onclick={() => openEdit(t)}
+										>
+											<Pencil class="size-3.5" aria-hidden="true" />
+										</button>
+									</IconActionTip>
+								</WashActionKbd>
 							</td>
 							<td>{(safePage - 1) * pageSize + i + 1}</td>
 							<td>
@@ -280,12 +315,8 @@
 							</td>
 							<td><code class="text-xs">{t.slug}</code></td>
 							<td>{t.version}</td>
-							<td class="text-ink-muted whitespace-nowrap text-sm"
-								>{shortDateTime(t.createdAt)}</td
-							>
-							<td class="text-ink-muted whitespace-nowrap text-sm"
-								>{shortDateTime(t.updatedAt)}</td
-							>
+							<td class="text-ink-muted text-sm whitespace-nowrap">{shortDateTime(t.createdAt)}</td>
+							<td class="text-ink-muted text-sm whitespace-nowrap">{shortDateTime(t.updatedAt)}</td>
 						</tr>
 					{/each}
 				{/if}
@@ -317,7 +348,7 @@
 			<div class="join">
 				<button
 					type="button"
-					class="btn btn-sm join-item"
+					class="btn join-item btn-sm"
 					class:cursor-pointer={safePage > 1}
 					class:cursor-not-allowed={safePage <= 1}
 					disabled={safePage <= 1}
@@ -328,7 +359,7 @@
 				{#each pageButtons as p (p)}
 					<button
 						type="button"
-						class="btn btn-sm join-item cursor-pointer"
+						class="btn join-item cursor-pointer btn-sm"
 						class:btn-active={p === safePage}
 						onclick={() => (page = p)}
 					>
@@ -337,7 +368,7 @@
 				{/each}
 				<button
 					type="button"
-					class="btn btn-sm join-item"
+					class="btn join-item btn-sm"
 					class:cursor-pointer={safePage < totalPages}
 					class:cursor-not-allowed={safePage >= totalPages}
 					disabled={safePage >= totalPages}
@@ -351,36 +382,34 @@
 </div>
 
 <dialog bind:this={createDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-lg border bg-base-100 shadow-sm">
-		<h2 class="card-title text-primary font-bold">Add template</h2>
+	<div class="modal-box w-11/12 max-w-lg border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="card-title font-bold text-primary">Add template</h2>
 		<form
 			method="POST"
 			action="?/createTemplate"
 			class="mt-4 flex flex-col gap-3"
-			use:enhance={bindSubmitting((v) => (creating = v), async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') closeCreate();
-			})}
+			use:enhance={bindSubmitting(
+				(v) => (creating = v),
+				async ({ result, update }) => {
+					await update();
+					if (result.type === 'success') closeCreate();
+				}
+			)}
 		>
 			<label class="form-control flex w-full flex-col" for="tpl-name">
 				<span class="label-text mb-1">
-					Name<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span>
+					Name<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span>
 				</span>
-				<input
-					id="tpl-name"
-					name="name"
-					class="input input-bordered w-full cursor-text"
-					required
-				/>
+				<input id="tpl-name" name="name" class="input-bordered input w-full cursor-text" required />
 			</label>
 			<label class="form-control flex w-full flex-col" for="tpl-slug">
 				<span class="label-text mb-1">
-					Slug<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span>
+					Slug<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span>
 				</span>
 				<input
 					id="tpl-slug"
 					name="slug"
-					class="input input-bordered w-full cursor-text"
+					class="input-bordered input w-full cursor-text"
 					placeholder="clinic-queue"
 					required
 				/>
@@ -390,16 +419,15 @@
 				<textarea
 					id="tpl-description"
 					name="description"
-					class="textarea textarea-bordered w-full cursor-text"
-					rows="2"
-				></textarea>
+					class="textarea-bordered textarea w-full cursor-text"
+					rows="2"></textarea>
 			</label>
 			<label class="form-control flex w-full flex-col" for="tpl-version">
 				<span class="label-text mb-1">Version</span>
 				<input
 					id="tpl-version"
 					name="version"
-					class="input input-bordered w-full cursor-text"
+					class="input-bordered input w-full cursor-text"
 					value="1.0.0"
 					placeholder="1.0.0"
 				/>
@@ -451,43 +479,42 @@
 </dialog>
 
 <dialog bind:this={editDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-lg border bg-base-100 shadow-sm">
-		<h2 class="card-title text-secondary font-bold">Edit template</h2>
+	<div class="modal-box w-11/12 max-w-lg border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="card-title font-bold text-secondary">Edit template</h2>
 		{#if editRow}
 			<form
 				method="POST"
 				action="?/updateTemplate"
 				class="mt-4 flex flex-col gap-3"
-				use:enhance={bindSubmitting((v) => (editing = v), async ({ result, update }) => {
-					await update();
-					if (result.type === 'success') closeEdit();
-				})}
+				use:enhance={bindSubmitting(
+					(v) => (editing = v),
+					async ({ result, update }) => {
+						await update();
+						if (result.type === 'success') closeEdit();
+					}
+				)}
 			>
 				<input type="hidden" name="id" value={editRow.id} />
 				<label class="form-control flex w-full flex-col" for="edit-tpl-name">
 					<span class="label-text mb-1">
-						Name<span class="text-error align-top text-sm leading-none" aria-hidden="true"
-							>*</span
-						>
+						Name<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span>
 					</span>
 					<input
 						id="edit-tpl-name"
 						name="name"
-						class="input input-bordered w-full cursor-text"
+						class="input-bordered input w-full cursor-text"
 						value={editRow.name}
 						required
 					/>
 				</label>
 				<label class="form-control flex w-full flex-col" for="edit-tpl-slug">
 					<span class="label-text mb-1">
-						Slug<span class="text-error align-top text-sm leading-none" aria-hidden="true"
-							>*</span
-						>
+						Slug<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span>
 					</span>
 					<input
 						id="edit-tpl-slug"
 						name="slug"
-						class="input input-bordered w-full cursor-text"
+						class="input-bordered input w-full cursor-text"
 						value={editRow.slug}
 						required
 					/>
@@ -497,7 +524,7 @@
 					<textarea
 						id="edit-tpl-description"
 						name="description"
-						class="textarea textarea-bordered w-full cursor-text"
+						class="textarea-bordered textarea w-full cursor-text"
 						rows="2">{editRow.description ?? ''}</textarea
 					>
 				</label>
@@ -506,7 +533,7 @@
 					<input
 						id="edit-tpl-version"
 						name="version"
-						class="input input-bordered w-full cursor-text"
+						class="input-bordered input w-full cursor-text"
 						value={editRow.version}
 					/>
 				</label>

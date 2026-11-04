@@ -8,6 +8,7 @@ import { enforceTrialAccess } from '#lib/server/qms/trial-expiry';
 export type MembershipRole =
 	| 'platform_admin'
 	| 'business_owner'
+	| 'business_admin'
 	| 'manager'
 	| 'counter_agent'
 	| 'guest';
@@ -15,9 +16,15 @@ export type MembershipRole =
 export type AppUser = { id: string; email: string; name: string };
 export type MembershipRow = InferSelectModel<typeof membership>;
 
-const STAFF_ROLES: MembershipRole[] = ['business_owner', 'manager', 'counter_agent'];
+const STAFF_ROLES: MembershipRole[] = [
+	'business_owner',
+	'business_admin',
+	'manager',
+	'counter_agent'
+];
 /** Setup / console CRUD: not counter_agent. */
-const MANAGER_ROLES: MembershipRole[] = ['business_owner', 'manager'];
+const MANAGER_ROLES: MembershipRole[] = ['business_owner', 'business_admin', 'manager'];
+const OWNER_ROLES: MembershipRole[] = ['business_owner'];
 
 /** UUID v1-v5 shape used for `/b/[businessId]` routing identity. */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -119,6 +126,16 @@ export async function requireStaff(user: AppUser | undefined | null, businessId:
 /** Owner/manager (and platform admin) for business setup CRUD. */
 export async function requireManager(user: AppUser | undefined | null, businessId: string) {
 	return requireBusinessRole(user, businessId, MANAGER_ROLES);
+}
+
+/** Owner-only actions (e.g. creating business_admin). */
+export async function requireOwner(user: AppUser | undefined | null, businessId: string) {
+	return requireBusinessRole(user, businessId, OWNER_ROLES);
+}
+
+/** Staff registration / user-group admin. */
+export async function requireStaffRegistrar(user: AppUser | undefined | null, businessId: string) {
+	return requireBusinessRole(user, businessId, ['business_owner', 'business_admin']);
 }
 
 export async function requireGuestOrStaff(user: AppUser | undefined | null, businessId: string) {

@@ -8,6 +8,10 @@
 	import DateRangeFilter from '#lib/component/own/local/private/data-table/DateRangeFilter.svelte';
 	import SearchSelect from '#lib/component/own/local/private/SearchSelect.svelte';
 	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
+	import WashActionKbd from '#lib/component/own/local/keyboard/WashActionKbd.svelte';
+	import ShortcutTarget from '#lib/component/own/local/keyboard/ShortcutTarget.svelte';
+	import { registerDataTableHeaderShortcuts } from '#lib/keyboard/page-table-shortcuts';
+	import { m } from '#lib/paraglide/messages';
 
 	let { data } = $props();
 
@@ -35,9 +39,7 @@
 		data.logs.filter((row) => {
 			const q = summaryFilter.trim().toLowerCase();
 			const summaryOk =
-				!q ||
-				row.summary.toLowerCase().includes(q) ||
-				row.detail.toLowerCase().includes(q);
+				!q || row.summary.toLowerCase().includes(q) || row.detail.toLowerCase().includes(q);
 			const kindOk = !kindFilter || row.kind === kindFilter;
 			const statusOk = !statusFilter || row.status === statusFilter;
 			const createdOk = inDateRange(row.createdAt, createdRange);
@@ -52,6 +54,9 @@
 	const totalPages = $derived(Math.max(1, Math.ceil(filtered.length / pageSize)));
 	const safePage = $derived(Math.min(page, totalPages));
 	const pageRows = $derived(filtered.slice((safePage - 1) * pageSize, safePage * pageSize));
+
+	let keyboardRowIndex = $state<number | null>(null);
+	const tableRowActions = $derived({});
 	const showingFrom = $derived(filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1);
 	const showingTo = $derived(Math.min(safePage * pageSize, filtered.length));
 	const footerSummary = $derived(
@@ -116,6 +121,14 @@
 		if (status === 'failed') return washRecipes.badgeSoft('error');
 		return 'badge badge-ghost';
 	}
+
+	$effect(() => {
+		const off = registerDataTableHeaderShortcuts('logs', {
+			onRefresh: () => void handleRefresh(),
+			refreshDisabled: () => refreshing
+		});
+		return off;
+	});
 </script>
 
 <svelte:head>
@@ -128,31 +141,37 @@
 		title="Logs"
 		description="Audit actions, ticket events, and notification outbox for this business (latest 400)."
 		bind:bodyEl
-		footerSummary={footerSummary}
+		{footerSummary}
+		keyboardRows={pageRows}
+		rowActions={tableRowActions}
+		tableId="logs"
+		bind:keyboardRowIndex
 	>
 		{#snippet headerActions()}
 			<WashTooltip tooltipText="Refresh" className="tooltip-secondary">
-<button
-					type="button"
-					class="btn btn-ghost btn-square btn-sm btn-secondary"
-					class:cursor-pointer={!refreshing}
-					class:cursor-not-allowed={refreshing}
-					class:btn-disabled={refreshing}
-					class:loading={refreshing}
-					aria-label="Refresh"
-					aria-busy={refreshing}
-					disabled={refreshing}
-					onclick={() => void handleRefresh()}
-				>
-					{#if !refreshing}
-						<RefreshCw class="size-4" aria-hidden="true" />
-					{/if}
-				</button>
-</WashTooltip>
+				<ShortcutTarget keys={['R']} label={m.keyboard_action_refresh()}>
+					<button
+						type="button"
+						class="btn btn-square btn-ghost btn-secondary btn-sm"
+						class:cursor-pointer={!refreshing}
+						class:cursor-not-allowed={refreshing}
+						class:btn-disabled={refreshing}
+						class:loading={refreshing}
+						aria-label="Refresh"
+						aria-busy={refreshing}
+						disabled={refreshing}
+						onclick={() => void handleRefresh()}
+					>
+						{#if !refreshing}
+							<RefreshCw class="size-4" aria-hidden="true" />
+						{/if}
+					</button>
+				</ShortcutTarget>
+			</WashTooltip>
 		{/snippet}
 
-		<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
-			<thead class="bg-base-100 sticky top-0 z-10">
+		<table class="table w-full table-zebra [&_tbody_tr]:hover:bg-primary/40">
+			<thead class="sticky top-0 z-10 bg-base-100">
 				<tr>
 					<th>Actions</th>
 					<th>No</th>
@@ -168,7 +187,7 @@
 					<th>
 						<input
 							type="text"
-							class="input input-xs input-bordered w-full max-w-[12rem] cursor-text"
+							class="input-bordered input w-full max-w-[12rem] cursor-text input-xs"
 							placeholder="Filter…"
 							aria-label="Filter by summary or detail"
 							bind:value={summaryFilter}
@@ -215,7 +234,11 @@
 					</tr>
 				{:else}
 					{#each pageRows as row, i (row.id)}
-						<tr>
+						<tr
+							data-kbd-row-id={row.id}
+							data-kbd-row-slot={String(i + 1)}
+							data-kbd-row-focus={keyboardRowIndex === i ? 'true' : undefined}
+						>
 							<td>
 								<span class="text-ink-muted text-xs">-</span>
 							</td>
@@ -226,7 +249,7 @@
 							<td class="text-ink-muted max-w-[18rem] truncate text-sm" title={row.detail}
 								>{row.detail}</td
 							>
-							<td class="text-ink-muted whitespace-nowrap text-sm"
+							<td class="text-ink-muted text-sm whitespace-nowrap"
 								>{shortDateTime(row.createdAt)}</td
 							>
 						</tr>
@@ -260,7 +283,7 @@
 			<div class="join">
 				<button
 					type="button"
-					class="btn btn-sm join-item"
+					class="btn join-item btn-sm"
 					class:cursor-pointer={safePage > 1}
 					class:cursor-not-allowed={safePage <= 1}
 					disabled={safePage <= 1}
@@ -271,7 +294,7 @@
 				{#each pageButtons as p (p)}
 					<button
 						type="button"
-						class="btn btn-sm join-item cursor-pointer"
+						class="btn join-item cursor-pointer btn-sm"
 						class:btn-active={p === safePage}
 						onclick={() => (page = p)}
 					>
@@ -280,7 +303,7 @@
 				{/each}
 				<button
 					type="button"
-					class="btn btn-sm join-item"
+					class="btn join-item btn-sm"
 					class:cursor-pointer={safePage < totalPages}
 					class:cursor-not-allowed={safePage >= totalPages}
 					disabled={safePage >= totalPages}

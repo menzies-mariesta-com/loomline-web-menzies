@@ -167,6 +167,68 @@ export const invite = pgTable(
 	(t) => [index('invite_business_idx').on(t.businessId), index('invite_email_idx').on(t.email)]
 );
 
+export const businessConsolePage = pgTable(
+	'business_console_page',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		businessId: uuid('business_id')
+			.notNull()
+			.references(() => business.id, { onDelete: 'cascade' }),
+		path: text('path').notNull(),
+		label: text('label').notNull(),
+		groupLabel: text('group_label').notNull(),
+		sortOrder: integer('sort_order').notNull().default(0),
+		...timestamps
+	},
+	(t) => [
+		uniqueIndex('business_console_page_business_path_uidx').on(t.businessId, t.path),
+		index('business_console_page_business_idx').on(t.businessId)
+	]
+);
+
+export const businessUserGroup = pgTable(
+	'business_user_group',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		businessId: uuid('business_id')
+			.notNull()
+			.references(() => business.id, { onDelete: 'cascade' }),
+		name: text('name').notNull(),
+		isSystem: boolean('is_system').notNull().default(false),
+		...timestamps
+	},
+	(t) => [
+		uniqueIndex('business_user_group_business_name_uidx').on(t.businessId, t.name),
+		index('business_user_group_business_idx').on(t.businessId)
+	]
+);
+
+export const businessUserGroupPage = pgTable(
+	'business_user_group_page',
+	{
+		userGroupId: uuid('user_group_id')
+			.notNull()
+			.references(() => businessUserGroup.id, { onDelete: 'cascade' }),
+		pageId: uuid('page_id')
+			.notNull()
+			.references(() => businessConsolePage.id, { onDelete: 'cascade' })
+	},
+	(t) => [uniqueIndex('business_user_group_page_uidx').on(t.userGroupId, t.pageId)]
+);
+
+export const membershipUserGroup = pgTable(
+	'membership_user_group',
+	{
+		membershipId: uuid('membership_id')
+			.notNull()
+			.references(() => membership.id, { onDelete: 'cascade' }),
+		userGroupId: uuid('user_group_id')
+			.notNull()
+			.references(() => businessUserGroup.id, { onDelete: 'cascade' })
+	},
+	(t) => [uniqueIndex('membership_user_group_uidx').on(t.membershipId, t.userGroupId)]
+);
+
 export const site = pgTable(
 	'site',
 	{
@@ -537,13 +599,23 @@ export const voiceProfile = pgTable(
 		announceLocales: jsonb('announce_locales').$type<string[]>().notNull().default(['en']),
 		/** How many times to run the full language sequence per call. */
 		announceRepeat: integer('announce_repeat').notNull().default(1),
+		/** Pause after each full language pass before the next repeat (ms). */
+		announceRepeatDelayMs: integer('announce_repeat_delay_ms').notNull().default(2000),
 		ttsVoiceId: text('tts_voice_id'),
+		/** Global rate/pitch/volume and optional voiceURI per app locale code. */
+		speechSettings: jsonb('speech_settings')
+			.$type<{
+				rate: number;
+				pitch: number;
+				volume: number;
+				localeVoices: Record<string, string>;
+			}>()
+			.notNull()
+			.default({ rate: 1, pitch: 1, volume: 1, localeVoices: {} }),
 		templates: jsonb('templates')
 			.$type<Record<string, string>>()
 			.notNull()
-			.default({
-				now_serving: 'Now serving {number} at counter {counter}'
-			}),
+			.default({}),
 		isDefault: boolean('is_default').notNull().default(false),
 		...timestamps
 	},
@@ -623,6 +695,8 @@ export const businessRelations = relations(business, ({ one, many }) => ({
 	}),
 	sites: many(site),
 	memberships: many(membership),
+	consolePages: many(businessConsolePage),
+	userGroups: many(businessUserGroup),
 	services: many(service),
 	queues: many(queue),
 	departments: many(department),
@@ -644,7 +718,47 @@ export const trialRequestRelations = relations(trialRequest, ({ one }) => ({
 export const membershipRelations = relations(membership, ({ one, many }) => ({
 	user: one(user, { fields: [membership.userId], references: [user.id] }),
 	business: one(business, { fields: [membership.businessId], references: [business.id] }),
-	sites: many(membershipSite)
+	sites: many(membershipSite),
+	userGroups: many(membershipUserGroup)
+}));
+
+export const businessConsolePageRelations = relations(businessConsolePage, ({ one, many }) => ({
+	business: one(business, {
+		fields: [businessConsolePage.businessId],
+		references: [business.id]
+	}),
+	groupLinks: many(businessUserGroupPage)
+}));
+
+export const businessUserGroupRelations = relations(businessUserGroup, ({ one, many }) => ({
+	business: one(business, {
+		fields: [businessUserGroup.businessId],
+		references: [business.id]
+	}),
+	pageLinks: many(businessUserGroupPage),
+	membershipLinks: many(membershipUserGroup)
+}));
+
+export const businessUserGroupPageRelations = relations(businessUserGroupPage, ({ one }) => ({
+	userGroup: one(businessUserGroup, {
+		fields: [businessUserGroupPage.userGroupId],
+		references: [businessUserGroup.id]
+	}),
+	page: one(businessConsolePage, {
+		fields: [businessUserGroupPage.pageId],
+		references: [businessConsolePage.id]
+	})
+}));
+
+export const membershipUserGroupRelations = relations(membershipUserGroup, ({ one }) => ({
+	membership: one(membership, {
+		fields: [membershipUserGroup.membershipId],
+		references: [membership.id]
+	}),
+	userGroup: one(businessUserGroup, {
+		fields: [membershipUserGroup.userGroupId],
+		references: [businessUserGroup.id]
+	})
 }));
 
 export const siteRelations = relations(site, ({ one, many }) => ({

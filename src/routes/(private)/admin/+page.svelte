@@ -15,40 +15,41 @@
 </svelte:head>
 
 <div class="flex flex-col gap-6">
-	<PageHeader
-		title="Overview"
-		subtitle="Platform KPIs across all tenant businesses."
-	/>
+	<PageHeader title="Overview" subtitle="Platform KPIs across all tenant businesses." />
 
-	<div class="stats stats-vertical border-base-300 bg-base-100 w-full shadow-sm sm:stats-horizontal border">
+	<div
+		class="stats w-full stats-vertical border border-base-300 bg-base-100 shadow-sm sm:stats-horizontal"
+	>
 		<a href={resolve('/admin/businesses')} class="stat cursor-pointer hover:bg-primary/5">
-			<div class="stat-title text-ink-muted text-xs tracking-wide uppercase">Businesses</div>
-			<div class="stat-value text-primary text-2xl font-semibold">{data.kpis.businesses}</div>
+			<div class="text-ink-muted stat-title text-xs tracking-wide uppercase">Businesses</div>
+			<div class="stat-value text-2xl font-semibold text-primary">{data.kpis.businesses}</div>
 			<div class="stat-desc">Manage tenants</div>
 		</a>
 		<a href={resolve('/admin/businesses')} class="stat cursor-pointer hover:bg-primary/5">
-			<div class="stat-title text-ink-muted text-xs tracking-wide uppercase">Active memberships</div>
+			<div class="text-ink-muted stat-title text-xs tracking-wide uppercase">
+				Active memberships
+			</div>
 			<div class="stat-value text-2xl font-semibold">{data.kpis.memberships}</div>
 			<div class="stat-desc">Across all businesses</div>
 		</a>
 		<a href={resolve('/admin/businesses')} class="stat cursor-pointer hover:bg-primary/5">
-			<div class="stat-title text-ink-muted text-xs tracking-wide uppercase">Active tickets</div>
+			<div class="text-ink-muted stat-title text-xs tracking-wide uppercase">Active tickets</div>
 			<div class="stat-value text-2xl font-semibold">{data.kpis.activeTickets}</div>
 			<div class="stat-desc">Waiting, called, serving, held</div>
 		</a>
 		<a href={resolve('/admin/invites')} class="stat cursor-pointer hover:bg-primary/5">
-			<div class="stat-title text-ink-muted text-xs tracking-wide uppercase">Pending invites</div>
+			<div class="text-ink-muted stat-title text-xs tracking-wide uppercase">Pending invites</div>
 			<div class="stat-value text-2xl font-semibold">{data.kpis.pendingInvites}</div>
 			<div class="stat-desc">Owner invites</div>
 		</a>
 	</div>
 
 	{#if data.statusBreakdown.length}
-		<section class="border-base-300 rounded-box border bg-base-100 p-4 {washRecipes.paneCard}">
-			<h2 class="card-title text-secondary mb-3 font-bold">Business status</h2>
+		<section class="rounded-box border border-base-300 bg-base-100 p-4 {washRecipes.paneCard}">
+			<h2 class="mb-3 card-title font-bold text-secondary">Business status</h2>
 			<div class="flex flex-wrap gap-2">
 				{#each data.statusBreakdown as row (row.status)}
-					<span class="badge badge-outline badge-lg gap-1.5">
+					<span class="badge gap-1.5 badge-outline badge-lg">
 						<span class="text-ink-muted">{row.status}</span>
 						<span class="font-semibold">{row.n}</span>
 					</span>
@@ -57,10 +58,12 @@
 		</section>
 	{/if}
 
-	<section class="border-base-300 rounded-box flex flex-col overflow-hidden border bg-base-100">
-		<div class="border-base-300 flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
-			<h2 class="card-title text-secondary font-bold">Recent businesses</h2>
-			<a class="link link-primary cursor-pointer text-sm" href={resolve('/admin/businesses')}
+	<section class="flex flex-col overflow-hidden rounded-box border border-base-300 bg-base-100">
+		<div
+			class="flex flex-wrap items-center justify-between gap-2 border-b border-base-300 px-4 py-3"
+		>
+			<h2 class="card-title font-bold text-secondary">Recent businesses</h2>
+			<a class="link cursor-pointer text-sm link-primary" href={resolve('/admin/businesses')}
 				>Manage all</a
 			>
 		</div>
@@ -84,8 +87,8 @@
 								<td class="whitespace-nowrap">
 									<div class="flex items-center gap-0.5">
 										<IconActionTip tip="Open console" tone="primary">
-<a
-												class="btn btn-ghost btn-square btn-primary btn-sm cursor-pointer"
+											<a
+												class="btn btn-square cursor-pointer btn-ghost btn-primary btn-sm"
 												href={`/b/${b.id}`}
 												aria-label="Open console"
 											>
@@ -94,15 +97,14 @@
 										</IconActionTip>
 
 										<IconActionTip tip="View logs" tone="info">
-<a
-												class="btn btn-ghost btn-square btn-info btn-sm cursor-pointer"
+											<a
+												class="btn btn-square cursor-pointer btn-ghost btn-info btn-sm"
 												href={`/b/${b.id}/logs`}
 												aria-label="View logs"
 											>
 												<Logs class="size-4" aria-hidden="true" />
 											</a>
 										</IconActionTip>
-
 									</div>
 								</td>
 								<td>{i + 1}</td>

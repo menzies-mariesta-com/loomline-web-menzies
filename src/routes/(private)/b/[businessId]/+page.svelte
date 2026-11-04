@@ -263,7 +263,7 @@
 </svelte:head>
 
 {#if form?.message && !toastGone}
-	<div class="toast toast-bottom toast-end z-[100]">
+	<div class="toast toast-end toast-bottom z-[100]">
 		<div
 			class="alert shadow-lg"
 			class:alert-success={form.success}
@@ -284,60 +284,43 @@
 	<PageHeader title="Overview" {subtitle}>
 		{#snippet actions()}
 			<div class="flex flex-wrap items-center gap-3">
-				{#if data.brand.imageUrl}
-					<img
-						src={data.brand.imageUrl}
-						alt=""
-						class="border-base-300 size-10 rounded-box border object-cover"
-						width="40"
-						height="40"
-					/>
-				{:else}
-					<div
-						class="border-base-300 bg-base-200 text-primary flex size-10 items-center justify-center rounded-box border text-sm font-bold"
-						aria-hidden="true"
-					>
-						{data.brand.name.slice(0, 1).toUpperCase()}
-					</div>
-				{/if}
-				<span class="text-base-content/70 max-w-48 truncate text-sm font-medium sm:max-w-xs"
-					>{data.brand.name}</span
-				>
 				{#if !data.isStaff}
-					<a href={`${base}/guest`} class="btn btn-primary cursor-pointer">Open guest desk</a>
+					<a href={`${base}/guest`} class="btn cursor-pointer btn-primary">Open guest desk</a>
 				{:else if data.isCounterAgent}
-					<a href={`${base}/agent`} class="btn btn-primary cursor-pointer">Agent console</a>
+					<a href={`${base}/agent`} class="btn cursor-pointer btn-primary">Agent console</a>
 				{:else if data.canAnalytics}
 					<div class="join">
 						{#each [1, 7, 30] as d (d)}
 							<a
-								class="btn btn-sm join-item cursor-pointer"
+								class="btn join-item cursor-pointer btn-sm"
 								class:btn-active={data.days === d}
 								href={resolve(`/b/${data.business.id}?days=${d}`)}>{d}d</a
 							>
 						{/each}
 					</div>
 					<a
-						class="btn btn-sm btn-outline cursor-pointer"
+						class="btn cursor-pointer btn-outline btn-sm"
 						href={resolve(`/api/export/analytics?businessId=${data.business.id}&days=${data.days}`)}
 						>Export CSV</a
 					>
-					<a href={`${base}/agent`} class="btn btn-primary btn-sm cursor-pointer">Agent console</a>
+					<a href={`${base}/agent`} class="btn cursor-pointer btn-primary btn-sm">Agent console</a>
 				{:else}
-					<a href={`${base}/agent`} class="btn btn-primary cursor-pointer">Agent console</a>
+					<a href={`${base}/agent`} class="btn cursor-pointer btn-primary">Agent console</a>
 				{/if}
 			</div>
 		{/snippet}
 	</PageHeader>
 
 	{#if data.needsSetup && data.canSetup}
-		<section class="border-base-300 rounded-box border bg-base-100 p-4 shadow-sm {washRecipes.paneCard}">
-			<h2 class="card-title text-secondary mb-1 font-bold">Finish setup</h2>
-			<p class="text-base-content/70 mb-3 text-sm">
+		<section
+			class="rounded-box border border-base-300 bg-base-100 p-4 shadow-sm {washRecipes.paneCard}"
+		>
+			<h2 class="mb-1 card-title font-bold text-secondary">Finish setup</h2>
+			<p class="mb-3 text-sm text-base-content/70">
 				Create your first department to organize counters and start serving tickets.
 			</p>
 			<div class="flex flex-wrap gap-2">
-				<a href={`${base}/departments`} class="btn btn-secondary cursor-pointer">Add department</a>
+				<a href={`${base}/departments`} class="btn cursor-pointer btn-secondary">Add department</a>
 				{#if data.sites.length > 0}
 					<form
 						method="POST"
@@ -358,20 +341,22 @@
 						</button>
 					</form>
 				{:else}
-					<a href={`${base}/sites`} class="btn btn-outline cursor-pointer">Create a site first</a>
+					<a href={`${base}/sites`} class="btn cursor-pointer btn-outline">Create a site first</a>
 				{/if}
 			</div>
 		</section>
 	{/if}
 
 	{#if data.canSetup && inv.devicesActive === 0}
-		<section class="border-base-300 rounded-box border bg-base-100 p-4 shadow-sm {washRecipes.paneCard}">
-			<h2 class="card-title text-info mb-1 font-bold">Open the floor</h2>
-			<p class="text-base-content/70 mb-3 text-sm">
+		<section
+			class="rounded-box border border-base-300 bg-base-100 p-4 shadow-sm {washRecipes.paneCard}"
+		>
+			<h2 class="mb-1 card-title font-bold text-info">Open the floor</h2>
+			<p class="mb-3 text-sm text-base-content/70">
 				TVs and kiosks are registered under Devices (pairing links). Counters in setup do not appear
 				on a display until someone issues a ticket and an agent presses Call next.
 			</p>
-			<a href={`${base}/devices`} class="btn btn-info cursor-pointer">Add TV &amp; kiosk</a>
+			<a href={`${base}/devices`} class="btn cursor-pointer btn-info">Add TV &amp; kiosk</a>
 		</section>
 	{/if}
 
@@ -441,17 +426,17 @@
 					{@const Icon = action.icon}
 					<a
 						href={action.href}
-						class="border-base-300 hover:bg-primary/5 flex cursor-pointer items-start gap-3 rounded-box border bg-base-100 p-4 shadow-sm transition-colors {washRecipes.paneCard}"
+						class="flex cursor-pointer items-start gap-3 rounded-box border border-base-300 bg-base-100 p-4 shadow-sm transition-colors hover:bg-primary/5 {washRecipes.paneCard}"
 					>
 						<span
-							class="bg-primary/10 text-primary flex size-10 shrink-0 items-center justify-center rounded-box"
+							class="flex size-10 shrink-0 items-center justify-center rounded-box bg-primary/10 text-primary"
 							aria-hidden="true"
 						>
 							<Icon class="size-5" />
 						</span>
 						<span class="min-w-0">
-							<span class="text-base-content block font-semibold">{action.label}</span>
-							<span class="text-base-content/60 mt-0.5 block text-xs">{action.hint}</span>
+							<span class="block font-semibold text-base-content">{action.label}</span>
+							<span class="mt-0.5 block text-xs text-base-content/60">{action.hint}</span>
 						</span>
 					</a>
 				{/each}
@@ -463,10 +448,12 @@
 		<section class="space-y-4" aria-label="Counters">
 			<h2 class="text-base font-bold">Counters</h2>
 			{#if data.departments.length === 0}
-				<p class="text-base-content/60 text-sm">No departments yet.</p>
+				<p class="text-sm text-base-content/60">No departments yet.</p>
 			{:else}
 				{#each data.departments as dept (dept.id)}
-					<div class="border-base-300 rounded-box border bg-base-100 p-4 shadow-sm {washRecipes.paneCard}">
+					<div
+						class="rounded-box border border-base-300 bg-base-100 p-4 shadow-sm {washRecipes.paneCard}"
+					>
 						<div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
 							<h3 class="font-semibold">{dept.name}</h3>
 							<span class="text-ink-muted text-xs"
@@ -480,12 +467,12 @@
 								{#each dept.counters as c (c.id)}
 									<a
 										href={`${base}/agent?counterId=${c.id}`}
-										class="btn btn-sm cursor-pointer {counterStatusClass(c.status)}"
+										class="btn cursor-pointer btn-sm {counterStatusClass(c.status)}"
 										aria-label="Open agent at {c.label}"
 									>
 										<Monitor class="size-4" aria-hidden="true" />
 										{c.label}
-										<span class="badge badge-xs badge-ghost">{c.status}</span>
+										<span class="badge badge-ghost badge-xs">{c.status}</span>
 									</a>
 								{/each}
 							</div>
@@ -498,20 +485,20 @@
 
 	{#snippet liveTicketsCard(showViewAll: boolean)}
 		<section
-			class="border-base-300 w-full min-w-0 overflow-hidden rounded-box border bg-base-100 {washRecipes.tableChrome}"
+			class="w-full min-w-0 overflow-hidden rounded-box border border-base-300 bg-base-100 {washRecipes.tableChrome}"
 			aria-label="Live tickets"
 		>
 			<div
-				class="border-base-300 bg-base-100 flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3 sm:px-5"
+				class="flex shrink-0 items-center justify-between gap-3 border-b border-base-300 bg-base-100 px-4 py-3 sm:px-5"
 			>
 				<div class="min-w-0 flex-1">
-					<h2 class="text-base-content text-base leading-tight font-bold">Live tickets</h2>
-					<p class="text-base-content/60 mt-0.5 text-xs">
+					<h2 class="text-base leading-tight font-bold text-base-content">Live tickets</h2>
+					<p class="mt-0.5 text-xs text-base-content/60">
 						Waiting, called, serving, and held right now.
 					</p>
 				</div>
 				{#if showViewAll}
-					<a href={`${base}/tickets`} class="link link-primary shrink-0 cursor-pointer text-sm"
+					<a href={`${base}/tickets`} class="shrink-0 link cursor-pointer text-sm link-primary"
 						>View all</a
 					>
 				{/if}
@@ -519,13 +506,13 @@
 
 			{#if data.activeTickets.length === 0}
 				<div
-					class="text-base-content/60 flex min-h-32 items-center justify-center px-4 py-10 text-center text-sm sm:px-5"
+					class="flex min-h-32 items-center justify-center px-4 py-10 text-center text-sm text-base-content/60 sm:px-5"
 				>
 					No active tickets.
 				</div>
 			{:else}
 				<div class="w-full min-w-0 overflow-x-auto">
-					<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
+					<table class="table w-full table-zebra [&_tbody_tr]:hover:bg-primary/40">
 						<thead class="bg-base-100">
 							<tr>
 								<th class="w-14">No</th>
@@ -556,34 +543,35 @@
 
 	{#snippet recentActivityCard()}
 		<section
-			class="border-base-300 w-full min-w-0 overflow-hidden rounded-box border bg-base-100 {washRecipes.tableChrome}"
+			class="w-full min-w-0 overflow-hidden rounded-box border border-base-300 bg-base-100 {washRecipes.tableChrome}"
 			aria-label="Recent activity"
 		>
 			<div
-				class="border-base-300 bg-base-100 flex shrink-0 flex-wrap items-start justify-between gap-2 border-b px-4 py-3 sm:px-5"
+				class="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-base-300 bg-base-100 px-4 py-3 sm:px-5"
 			>
 				<div class="min-w-0">
-					<h2 class="text-base-content text-base leading-tight font-bold">Recent activity</h2>
-					<p class="text-base-content/60 mt-0.5 text-xs">Latest ticket events on this floor.</p>
+					<h2 class="text-base leading-tight font-bold text-base-content">Recent activity</h2>
+					<p class="mt-0.5 text-xs text-base-content/60">Latest ticket events on this floor.</p>
 				</div>
 				{#if data.canSetup}
-					<a class="link link-primary cursor-pointer text-sm" href={`${base}/logs`}>View all logs</a>
+					<a class="link cursor-pointer text-sm link-primary" href={`${base}/logs`}>View all logs</a
+					>
 				{/if}
 			</div>
 
 			{#if data.recentEvents.length === 0}
 				<div
-					class="text-base-content/60 flex min-h-32 items-center justify-center px-4 py-10 text-center text-sm sm:px-5"
+					class="flex min-h-32 items-center justify-center px-4 py-10 text-center text-sm text-base-content/60 sm:px-5"
 				>
 					No recent activity yet.
 				</div>
 			{:else}
-				<ul class="divide-base-300 divide-y">
+				<ul class="divide-y divide-base-300">
 					{#each data.recentEvents as event (event.id)}
 						<li class="flex items-start justify-between gap-3 px-4 py-3 sm:px-5">
 							<div class="min-w-0">
 								<p class="font-mono text-sm font-semibold tracking-wide">{event.ticketNumber}</p>
-								<p class="text-base-content/70 mt-0.5 text-xs">{titleCase(event.type)}</p>
+								<p class="mt-0.5 text-xs text-base-content/70">{titleCase(event.type)}</p>
 							</div>
 							<time class="text-ink-muted shrink-0 text-xs whitespace-nowrap"
 								>{shortDateTime(event.createdAt)}</time
@@ -610,7 +598,7 @@
 				<div class="flex flex-wrap items-end justify-between gap-2">
 					<div>
 						<h2 class="text-base font-bold">Period analytics</h2>
-						<p class="text-base-content/60 text-sm">
+						<p class="text-sm text-base-content/60">
 							{analytics.days} day window across tickets, queues, and devices.
 						</p>
 					</div>
@@ -635,7 +623,9 @@
 
 				<section aria-label="Ticket volume">
 					<h3 class="mb-2 text-sm font-bold">Ticket volume</h3>
-					<p class="text-base-content/60 mb-3 text-sm">Daily issued tickets in the selected window.</p>
+					<p class="mb-3 text-sm text-base-content/60">
+						Daily issued tickets in the selected window.
+					</p>
 					{#if volumeChart}
 						<WashChart options={volumeChart} height={280} title="Daily volume" />
 					{/if}
@@ -644,21 +634,21 @@
 				<div class="grid gap-6 lg:grid-cols-2">
 					<section aria-label="Status mix">
 						<h3 class="mb-2 text-sm font-bold">By status</h3>
-						<p class="text-base-content/60 mb-3 text-sm">Share of tickets by lifecycle status.</p>
+						<p class="mb-3 text-sm text-base-content/60">Share of tickets by lifecycle status.</p>
 						{#if statusChart}
 							<WashChart options={statusChart} height={300} title="Status mix" />
 						{:else}
-							<p class="text-base-content/60 text-sm">No tickets in this window.</p>
+							<p class="text-sm text-base-content/60">No tickets in this window.</p>
 						{/if}
 					</section>
 
 					<section aria-label="Source mix">
 						<h3 class="mb-2 text-sm font-bold">Channel mix</h3>
-						<p class="text-base-content/60 mb-3 text-sm">Where tickets were issued from.</p>
+						<p class="mb-3 text-sm text-base-content/60">Where tickets were issued from.</p>
 						{#if sourceChart}
 							<WashChart options={sourceChart} height={300} title="Sources" />
 						{:else}
-							<p class="text-base-content/60 text-sm">No source data yet.</p>
+							<p class="text-sm text-base-content/60">No source data yet.</p>
 						{/if}
 					</section>
 				</div>
@@ -666,28 +656,28 @@
 				<div class="grid gap-6 lg:grid-cols-2">
 					<section aria-label="By queue">
 						<h3 class="mb-2 text-sm font-bold">By queue</h3>
-						<p class="text-base-content/60 mb-3 text-sm">Ticket load across queues.</p>
+						<p class="mb-3 text-sm text-base-content/60">Ticket load across queues.</p>
 						{#if queueChart}
 							<WashChart options={queueChart} height={320} title="Queues" />
 						{:else}
-							<p class="text-base-content/60 text-sm">No queue activity yet.</p>
+							<p class="text-sm text-base-content/60">No queue activity yet.</p>
 						{/if}
 					</section>
 
 					<section aria-label="By service">
 						<h3 class="mb-2 text-sm font-bold">By service</h3>
-						<p class="text-base-content/60 mb-3 text-sm">Demand by service offering.</p>
+						<p class="mb-3 text-sm text-base-content/60">Demand by service offering.</p>
 						{#if serviceChart}
 							<WashChart options={serviceChart} height={320} title="Services" />
 						{:else}
-							<p class="text-base-content/60 text-sm">No service activity yet.</p>
+							<p class="text-sm text-base-content/60">No service activity yet.</p>
 						{/if}
 					</section>
 				</div>
 
 				<section aria-label="Wait and serve times">
 					<h3 class="mb-2 text-sm font-bold">Wait and serve times</h3>
-					<p class="text-base-content/60 mb-3 text-sm">
+					<p class="mb-3 text-sm text-base-content/60">
 						Average wait and serve duration by day (minutes).
 					</p>
 					{#if waitChart}
@@ -698,7 +688,9 @@
 				<div class="grid gap-6 lg:grid-cols-2">
 					<section aria-label="Outcomes">
 						<h3 class="mb-2 text-sm font-bold">Served vs no-show</h3>
-						<p class="text-base-content/60 mb-3 text-sm">Completed tickets compared with no-shows.</p>
+						<p class="mb-3 text-sm text-base-content/60">
+							Completed tickets compared with no-shows.
+						</p>
 						{#if outcomeChart}
 							<WashChart options={outcomeChart} height={280} title="Outcomes" />
 						{/if}
@@ -706,11 +698,11 @@
 
 					<section aria-label="Peak hours">
 						<h3 class="mb-2 text-sm font-bold">Peak hours</h3>
-						<p class="text-base-content/60 mb-3 text-sm">Busiest issue hours (UTC).</p>
+						<p class="mb-3 text-sm text-base-content/60">Busiest issue hours (UTC).</p>
 						{#if peakChart}
 							<WashChart options={peakChart} height={280} title="Hourly demand" />
 						{:else}
-							<p class="text-base-content/60 text-sm">No hourly data yet.</p>
+							<p class="text-sm text-base-content/60">No hourly data yet.</p>
 						{/if}
 					</section>
 				</div>
@@ -718,7 +710,7 @@
 				{#if analytics.devices.length > 0}
 					<section aria-label="Device activity">
 						<h3 class="mb-2 text-sm font-bold">Device activity</h3>
-						<p class="text-base-content/60 mb-3 text-sm">
+						<p class="mb-3 text-sm text-base-content/60">
 							Display devices: {analytics.deviceActive} active, {analytics.deviceInactive} inactive.
 						</p>
 						<div class="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -739,7 +731,7 @@
 				{#if analytics.siteRollup.length > 0}
 					<section aria-label="Sites">
 						<h3 class="mb-2 text-sm font-bold">Sites</h3>
-						<p class="text-base-content/60 mb-3 text-sm">Ticket volume by site in this window.</p>
+						<p class="mb-3 text-sm text-base-content/60">Ticket volume by site in this window.</p>
 						<div class="rounded-box border border-base-300 bg-base-100 {washRecipes.tableChrome}">
 							<div class="overflow-x-auto">
 								<table class="table table-zebra table-sm [&_tbody_tr]:hover:bg-primary/40">

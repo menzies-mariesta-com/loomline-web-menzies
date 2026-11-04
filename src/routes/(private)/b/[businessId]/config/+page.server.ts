@@ -4,14 +4,17 @@ import { db } from '#lib/server/db';
 import { business, voiceProfile } from '#lib/server/db/schema';
 import { requireBusinessRole } from '#lib/server/qms/guards';
 import {
-	DEFAULT_VOICE_TEMPLATE,
+	defaultAnnounceTemplateForLocale,
 	normalizeAnnounceLocales,
-	normalizeAnnounceRepeat
+	normalizeAnnounceRepeat,
+	normalizeAnnounceRepeatDelayMs,
+	normalizeSpeechSettings
 } from '#lib/util/voice';
 
 export const load: PageServerLoad = async ({ locals, params }) => {
 	const { business: biz } = await requireBusinessRole(locals.user, params.businessId, [
 		'business_owner',
+		'business_admin',
 		'manager',
 		'platform_admin'
 	]);
@@ -25,6 +28,7 @@ export const actions: Actions = {
 	saveMessaging: async ({ request, locals, params }) => {
 		const { business: biz } = await requireBusinessRole(locals.user, params.businessId, [
 			'business_owner',
+			'business_admin',
 			'manager',
 			'platform_admin'
 		]);
@@ -47,17 +51,49 @@ export const actions: Actions = {
 	saveVoice: async ({ request, locals, params }) => {
 		const { business: biz } = await requireBusinessRole(locals.user, params.businessId, [
 			'business_owner',
+			'business_admin',
 			'manager',
 			'platform_admin'
 		]);
 		const form = await request.formData();
-		const template = String(form.get('nowServing') ?? DEFAULT_VOICE_TEMPLATE).trim();
-		if (!template) {
-			return { success: false, message: 'Now serving template is required' };
-		}
 		const announceLocales = normalizeAnnounceLocales(String(form.get('announceLocales') ?? ''));
 		const announceRepeat = normalizeAnnounceRepeat(form.get('announceRepeat'), 1);
+		const delaySec = Number(form.get('announceRepeatDelaySec'));
+		const announceRepeatDelayMs = normalizeAnnounceRepeatDelayMs(
+			Number.isFinite(delaySec) ? delaySec * 1000 : undefined
+		);
 		const primaryLocale = announceLocales[0] ?? 'en';
+
+		let localeTemplates: Record<string, string> = {};
+		try {
+			localeTemplates = JSON.parse(String(form.get('localeTemplates') ?? '{}')) as Record<
+				string,
+				string
+			>;
+		} catch {
+			return { success: false, message: 'Invalid announcement templates' };
+		}
+
+		let speechSettings = normalizeSpeechSettings(null);
+		try {
+			speechSettings = normalizeSpeechSettings(
+				JSON.parse(String(form.get('speechSettings') ?? '{}'))
+			);
+		} catch {
+			return { success: false, message: 'Invalid speech settings' };
+		}
+
+		const templates: Record<string, string> = {};
+		for (const loc of announceLocales) {
+			const template = String(localeTemplates[loc] ?? defaultAnnounceTemplateForLocale(loc)).trim();
+			if (!template) {
+				return { success: false, message: `Announcement text is required for ${loc}` };
+			}
+			if (!template.includes('{number}')) {
+				return { success: false, message: `Include {number} in the ${loc} announcement text` };
+			}
+			templates[loc] = template;
+		}
 
 		const existing = await db.query.voiceProfile.findFirst({
 			where: eq(voiceProfile.businessId, biz.id)
@@ -66,7 +102,9 @@ export const actions: Actions = {
 			locale: primaryLocale,
 			announceLocales,
 			announceRepeat,
-			templates: { now_serving: template }
+			announceRepeatDelayMs,
+			speechSettings,
+			templates
 		};
 		if (existing) {
 			await db.update(voiceProfile).set(payload).where(eq(voiceProfile.id, existing.id));

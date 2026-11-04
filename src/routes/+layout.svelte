@@ -8,6 +8,7 @@
 		initWash,
 		washRecipes
 	} from '@menzies-mariesta-com/menzies-design-wash-ui/core';
+	import KeyboardHelpRoot from '#lib/component/own/local/keyboard/KeyboardHelpRoot.svelte';
 	import '#lib/asset/style/app.css';
 
 	let { children } = $props();
@@ -45,17 +46,21 @@
 
 {#if isChromeFree}
 	<!-- Auth, marketing, public TV/kiosk, and private shells: Wash atmosphere only. -->
-	<div class={washRecipes.washShell}>
-		{@render children()}
-	</div>
+	<KeyboardHelpRoot>
+		<div class={washRecipes.washShell}>
+			{@render children()}
+		</div>
+	</KeyboardHelpRoot>
 {:else}
-	<div class={washRecipes.washShell}>
-		<main class={washRecipes.washShellMain}>
-			<article class={washRecipes.washPanel}>
-				{@render children()}
-			</article>
-		</main>
-	</div>
+	<KeyboardHelpRoot>
+		<div class={washRecipes.washShell}>
+			<main class={washRecipes.washShellMain}>
+				<article class={washRecipes.washPanel}>
+					{@render children()}
+				</article>
+			</main>
+		</div>
+	</KeyboardHelpRoot>
 {/if}
 
 <div style="display:none">

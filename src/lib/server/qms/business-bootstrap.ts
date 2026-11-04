@@ -106,6 +106,8 @@ export async function applyIndustryPackToBusiness(businessId: string, packId: st
 			locale: biz.localeDefault,
 			announceLocales: [biz.localeDefault || 'en'],
 			announceRepeat: 1,
+			announceRepeatDelayMs: 2000,
+			speechSettings: { rate: 1, pitch: 1, volume: 1, localeVoices: {} },
 			templates: config.voiceScripts,
 			isDefault: true
 		});

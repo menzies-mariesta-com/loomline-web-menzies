@@ -148,6 +148,9 @@ export async function provisionOwnerBusiness(
 
 	await applyIndustryPackToBusiness(biz.id, packId);
 
+	const { ensureBusinessConsoleRbac } = await import('#lib/server/qms/bootstrap-console-rbac');
+	await ensureBusinessConsoleRbac(biz.id);
+
 	const token = normalizeInviteToken(randomToken(24));
 	const inviteUrl = inviteSetPasswordUrl(ORIGIN, token);
 	const [inv] = await db

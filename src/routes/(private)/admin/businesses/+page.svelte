@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import { invalidateAll, goto } from '$app/navigation';
 	import {
 		Ban,
 		CircleCheck,
@@ -24,6 +24,11 @@
 	import { PAID_PLAN_OPTIONS, TRIAL_DURATION_OPTIONS, planKeyLabel } from '#lib/tool/plans';
 	import IconActionTip from '#lib/component/wash/tooltip/IconActionTip.svelte';
 	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
+	import ShortcutTarget from '#lib/component/own/local/keyboard/ShortcutTarget.svelte';
+	import { registerDataTableHeaderShortcuts } from '#lib/keyboard/page-table-shortcuts';
+	import { m } from '#lib/paraglide/messages';
+	import { buildCrudRowActions } from '#lib/keyboard/table-actions';
+	import WashActionKbd from '#lib/component/own/local/keyboard/WashActionKbd.svelte';
 
 	const statusOptions = [
 		{ value: 'active', label: 'active' },
@@ -85,9 +90,7 @@
 	let editPlanKey = $state('cloud_starter');
 	let editTrialDuration = $state('7d');
 
-	const templateOptions = $derived(
-		data.templates.map((t) => ({ value: t.id, label: t.name }))
-	);
+	const templateOptions = $derived(data.templates.map((t) => ({ value: t.id, label: t.name })));
 	const configOptions = $derived(
 		data.configs.map((c) => ({ value: c.id, label: `${c.name} (${c.timezone})` }))
 	);
@@ -99,10 +102,7 @@
 	const filtered = $derived(
 		data.businesses.filter((b) => {
 			const q = nameFilter.trim().toLowerCase();
-			const nameOk =
-				!q ||
-				b.name.toLowerCase().includes(q) ||
-				b.slug.toLowerCase().includes(q);
+			const nameOk = !q || b.name.toLowerCase().includes(q) || b.slug.toLowerCase().includes(q);
 			const templateQ = templateFilter.trim().toLowerCase();
 			const templateName = b.industryPack?.name ?? '';
 			const templateOk = !templateQ || templateName.toLowerCase().includes(templateQ);
@@ -113,9 +113,7 @@
 			const planQ = planFilter.trim().toLowerCase();
 			const planLabel = planKeyLabel(b.planKey).toLowerCase();
 			const planOk =
-				!planQ ||
-				(b.planKey ?? '').toLowerCase().includes(planQ) ||
-				planLabel.includes(planQ);
+				!planQ || (b.planKey ?? '').toLowerCase().includes(planQ) || planLabel.includes(planQ);
 			const createdOk = inDateRange(b.createdAt, createdRange);
 			const updatedOk = inDateRange(b.updatedAt, updatedRange);
 			return nameOk && templateOk && configOk && statusOk && planOk && createdOk && updatedOk;
@@ -125,6 +123,15 @@
 	const totalPages = $derived(Math.max(1, Math.ceil(filtered.length / pageSize)));
 	const safePage = $derived(Math.min(page, totalPages));
 	const pageRows = $derived(filtered.slice((safePage - 1) * pageSize, safePage * pageSize));
+
+	let keyboardRowIndex = $state<number | null>(null);
+	const tableRowActions = $derived(
+		buildCrudRowActions({
+			onEdit: openEdit,
+			onDelete: openDelete,
+			onView: (row) => void goto(`/b/${row.id}`)
+		})
+	);
 	const showingFrom = $derived(filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1);
 	const showingTo = $derived(Math.min(safePage * pageSize, filtered.length));
 	const footerSummary = $derived(
@@ -173,8 +180,7 @@
 		editConfigId = row.configId ?? '';
 		editStatus = row.status;
 		editAccessKind = row.planKey === 'trial' ? 'trial' : 'plan';
-		editPlanKey =
-			row.planKey && row.planKey !== 'trial' ? row.planKey : 'cloud_starter';
+		editPlanKey = row.planKey && row.planKey !== 'trial' ? row.planKey : 'cloud_starter';
 		editTrialDuration = row.trialDuration ?? '7d';
 		if (editImagePreview) {
 			URL.revokeObjectURL(editImagePreview);
@@ -267,6 +273,15 @@
 		ro.observe(bodyEl);
 		return () => ro.disconnect();
 	});
+
+	$effect(() => {
+		const off = registerDataTableHeaderShortcuts('admin-businesses', {
+			onRefresh: () => void handleRefresh(),
+			refreshDisabled: () => refreshing,
+			onNew: openCreate
+		});
+		return off;
+	});
 </script>
 
 <svelte:head>
@@ -276,7 +291,7 @@
 
 <div class="flex min-h-0 flex-1 flex-col">
 	{#if form?.message && !toastGone}
-		<div class="toast toast-bottom toast-end z-[100]">
+		<div class="toast toast-end toast-bottom z-[100]">
 			<div
 				class="alert shadow-lg"
 				class:alert-success={form.success}
@@ -293,40 +308,52 @@
 		</div>
 	{/if}
 
-	<DataTableShell title="Businesses" bind:bodyEl footerSummary={footerSummary}>
+	<DataTableShell
+		title="Businesses"
+		bind:bodyEl
+		{footerSummary}
+		keyboardRows={pageRows}
+		rowActions={tableRowActions}
+		tableId="admin-businesses"
+		bind:keyboardRowIndex
+	>
 		{#snippet headerActions()}
 			<WashTooltip tooltipText="Refresh" className="tooltip-secondary">
-<button
-					type="button"
-					class="btn btn-ghost btn-square btn-sm btn-secondary"
-					class:cursor-pointer={!refreshing}
-					class:cursor-not-allowed={refreshing}
-					class:btn-disabled={refreshing}
-					class:loading={refreshing}
-					aria-label="Refresh"
-					aria-busy={refreshing}
-					disabled={refreshing}
-					onclick={() => void handleRefresh()}
-				>
-					{#if !refreshing}
-						<RefreshCw class="size-4" aria-hidden="true" />
-					{/if}
-				</button>
-</WashTooltip>
+				<ShortcutTarget keys={['R']} label={m.keyboard_action_refresh()}>
+					<button
+						type="button"
+						class="btn btn-square btn-ghost btn-secondary btn-sm"
+						class:cursor-pointer={!refreshing}
+						class:cursor-not-allowed={refreshing}
+						class:btn-disabled={refreshing}
+						class:loading={refreshing}
+						aria-label="Refresh"
+						aria-busy={refreshing}
+						disabled={refreshing}
+						onclick={() => void handleRefresh()}
+					>
+						{#if !refreshing}
+							<RefreshCw class="size-4" aria-hidden="true" />
+						{/if}
+					</button>
+				</ShortcutTarget>
+			</WashTooltip>
 			<WashTooltip tooltipText="Add" className="tooltip-primary">
-<button
-					type="button"
-					class="btn btn-ghost btn-square btn-sm btn-primary cursor-pointer"
-					aria-label="Add"
-					onclick={openCreate}
-				>
-					<Plus class="size-4" aria-hidden="true" />
-				</button>
-</WashTooltip>
+				<ShortcutTarget keys={['N']} label={m.keyboard_action_new()}>
+					<button
+						type="button"
+						class="btn btn-square cursor-pointer btn-ghost btn-primary btn-sm"
+						aria-label="Add"
+						onclick={openCreate}
+					>
+						<Plus class="size-4" aria-hidden="true" />
+					</button>
+				</ShortcutTarget>
+			</WashTooltip>
 		{/snippet}
 
-		<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
-			<thead class="bg-base-100 sticky top-0 z-10">
+		<table class="table w-full table-zebra [&_tbody_tr]:hover:bg-primary/40">
+			<thead class="sticky top-0 z-10 bg-base-100">
 				<tr>
 					<th>Actions</th>
 					<th>No</th>
@@ -344,7 +371,7 @@
 					<th>
 						<input
 							type="text"
-							class="input input-xs input-bordered w-full max-w-[10rem] cursor-text"
+							class="input-bordered input w-full max-w-[10rem] cursor-text input-xs"
 							placeholder="Filter…"
 							aria-label="Filter by name or slug"
 							bind:value={nameFilter}
@@ -353,7 +380,7 @@
 					<th>
 						<input
 							type="text"
-							class="input input-xs input-bordered w-full max-w-[8rem] cursor-text"
+							class="input-bordered input w-full max-w-[8rem] cursor-text input-xs"
 							placeholder="Filter…"
 							aria-label="Filter by plan"
 							bind:value={planFilter}
@@ -362,7 +389,7 @@
 					<th>
 						<input
 							type="text"
-							class="input input-xs input-bordered w-full max-w-[8rem] cursor-text"
+							class="input-bordered input w-full max-w-[8rem] cursor-text input-xs"
 							placeholder="Filter…"
 							aria-label="Filter by template"
 							bind:value={templateFilter}
@@ -371,7 +398,7 @@
 					<th>
 						<input
 							type="text"
-							class="input input-xs input-bordered w-full max-w-[8rem] cursor-text"
+							class="input-bordered input w-full max-w-[8rem] cursor-text input-xs"
 							placeholder="Filter…"
 							aria-label="Filter by config"
 							bind:value={configFilter}
@@ -413,44 +440,58 @@
 					</tr>
 				{:else}
 					{#each pageRows as b, i (b.id)}
-						<tr>
+						<tr
+							data-kbd-row-id={b.id}
+							data-kbd-row-slot={String(i + 1)}
+							data-kbd-row-focus={keyboardRowIndex === i ? 'true' : undefined}
+						>
 							<td>
 								<div class="flex items-center gap-0.5">
-									<IconActionTip tip="Edit" tone="secondary">
-<button
-											type="button"
-											class="btn btn-ghost btn-square btn-xs btn-secondary cursor-pointer"
-											aria-label="Edit"
-											onclick={() => openEdit(b)}
-										>
-											<Pencil class="size-3.5" aria-hidden="true" />
-										</button>
-									</IconActionTip>
+									<WashActionKbd key="e">
+										<WashActionKbd key="e">
+											<IconActionTip tip="Edit" tone="secondary">
+												<button
+													type="button"
+													class="btn btn-square cursor-pointer btn-ghost btn-secondary btn-xs"
+													aria-label="Edit"
+													onclick={() => openEdit(b)}
+												>
+													<Pencil class="size-3.5" aria-hidden="true" />
+												</button>
+											</IconActionTip>
+										</WashActionKbd>
+									</WashActionKbd>
 
-									<IconActionTip tip="Delete" tone="error">
-<button
-											type="button"
-											class="btn btn-ghost btn-square btn-xs btn-error cursor-pointer"
-											aria-label="Delete"
-											onclick={() => openDelete(b)}
-										>
-											<Trash2 class="size-3.5" aria-hidden="true" />
-										</button>
-									</IconActionTip>
+									<WashActionKbd key="d">
+										<WashActionKbd key="d">
+											<IconActionTip tip="Delete" tone="error">
+												<button
+													type="button"
+													class="btn btn-square cursor-pointer btn-ghost btn-error btn-xs"
+													aria-label="Delete"
+													onclick={() => openDelete(b)}
+												>
+													<Trash2 class="size-3.5" aria-hidden="true" />
+												</button>
+											</IconActionTip>
+										</WashActionKbd>
+									</WashActionKbd>
 
-									<IconActionTip tip="Open console" tone="primary">
-<a
-											class="btn btn-ghost btn-square btn-xs btn-primary cursor-pointer"
-											href={`/b/${b.id}`}
-											aria-label="Open console"
-										>
-											<ExternalLink class="size-3.5" aria-hidden="true" />
-										</a>
-									</IconActionTip>
+									<WashActionKbd key="v">
+										<IconActionTip tip="Open console" tone="primary">
+											<a
+												class="btn btn-square cursor-pointer btn-ghost btn-primary btn-xs"
+												href={`/b/${b.id}`}
+												aria-label="Open console"
+											>
+												<ExternalLink class="size-3.5" aria-hidden="true" />
+											</a>
+										</IconActionTip>
+									</WashActionKbd>
 
 									<IconActionTip tip="View logs" tone="info">
-<a
-											class="btn btn-ghost btn-square btn-xs btn-info cursor-pointer"
+										<a
+											class="btn btn-square cursor-pointer btn-ghost btn-info btn-xs"
 											href={`/b/${b.id}/logs`}
 											aria-label="View logs"
 										>
@@ -471,9 +512,9 @@
 										>
 											<input type="hidden" name="businessId" value={b.id} />
 											<IconActionTip tip="Suspend" tone="warning">
-<button
+												<button
 													type="submit"
-													class="btn btn-ghost btn-square btn-xs btn-warning"
+													class="btn btn-square btn-ghost btn-warning btn-xs"
 													class:cursor-pointer={busyId !== b.id}
 													class:cursor-not-allowed={busyId === b.id}
 													class:loading={busyId === b.id}
@@ -486,7 +527,6 @@
 													{/if}
 												</button>
 											</IconActionTip>
-
 										</form>
 									{:else}
 										<form
@@ -501,9 +541,9 @@
 										>
 											<input type="hidden" name="businessId" value={b.id} />
 											<IconActionTip tip="Activate" tone="success">
-<button
+												<button
 													type="submit"
-													class="btn btn-ghost btn-square btn-xs btn-success"
+													class="btn btn-square btn-ghost btn-success btn-xs"
 													class:cursor-pointer={busyId !== b.id}
 													class:cursor-not-allowed={busyId === b.id}
 													class:loading={busyId === b.id}
@@ -516,7 +556,6 @@
 													{/if}
 												</button>
 											</IconActionTip>
-
 										</form>
 									{/if}
 								</div>
@@ -550,12 +589,8 @@
 							<td>{b.industryPack?.name ?? '-'}</td>
 							<td>{b.config?.name ?? '-'}</td>
 							<td><span class={statusBadge(b.status)}>{b.status}</span></td>
-							<td class="text-ink-muted whitespace-nowrap text-sm"
-								>{shortDateTime(b.createdAt)}</td
-							>
-							<td class="text-ink-muted whitespace-nowrap text-sm"
-								>{shortDateTime(b.updatedAt)}</td
-							>
+							<td class="text-ink-muted text-sm whitespace-nowrap">{shortDateTime(b.createdAt)}</td>
+							<td class="text-ink-muted text-sm whitespace-nowrap">{shortDateTime(b.updatedAt)}</td>
 						</tr>
 					{/each}
 				{/if}
@@ -587,7 +622,7 @@
 			<div class="join">
 				<button
 					type="button"
-					class="btn btn-sm join-item"
+					class="btn join-item btn-sm"
 					class:cursor-pointer={safePage > 1}
 					class:cursor-not-allowed={safePage <= 1}
 					disabled={safePage <= 1}
@@ -598,7 +633,7 @@
 				{#each pageButtons as p (p)}
 					<button
 						type="button"
-						class="btn btn-sm join-item cursor-pointer"
+						class="btn join-item cursor-pointer btn-sm"
 						class:btn-active={p === safePage}
 						onclick={() => (page = p)}
 					>
@@ -607,7 +642,7 @@
 				{/each}
 				<button
 					type="button"
-					class="btn btn-sm join-item"
+					class="btn join-item btn-sm"
 					class:cursor-pointer={safePage < totalPages}
 					class:cursor-not-allowed={safePage >= totalPages}
 					disabled={safePage >= totalPages}
@@ -621,32 +656,30 @@
 </div>
 
 <dialog bind:this={createDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-lg border bg-base-100 shadow-sm">
-		<h2 class="card-title text-primary font-bold">Add business</h2>
+	<div class="modal-box w-11/12 max-w-lg border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="card-title font-bold text-primary">Add business</h2>
 		<form
 			method="POST"
 			action="?/createBusiness"
 			enctype="multipart/form-data"
 			class="mt-4 flex flex-col gap-3"
-			use:enhance={bindSubmitting((v) => (creating = v), async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') closeCreate();
-			})}
+			use:enhance={bindSubmitting(
+				(v) => (creating = v),
+				async ({ result, update }) => {
+					await update();
+					if (result.type === 'success') closeCreate();
+				}
+			)}
 		>
 			<label class="form-control flex w-full flex-col" for="biz-name">
 				<span class="label-text mb-1">
-					Name<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span>
+					Name<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span>
 				</span>
-				<input
-					id="biz-name"
-					name="name"
-					class="input input-bordered w-full cursor-text"
-					required
-				/>
+				<input id="biz-name" name="name" class="input-bordered input w-full cursor-text" required />
 			</label>
 			<label class="form-control flex w-full flex-col" for="biz-manager-email">
 				<span class="label-text mb-1">
-					Manager email<span class="text-error align-top text-sm leading-none" aria-hidden="true"
+					Manager email<span class="align-top text-sm leading-none text-error" aria-hidden="true"
 						>*</span
 					>
 				</span>
@@ -655,13 +688,13 @@
 					name="managerEmail"
 					type="email"
 					autocomplete="email"
-					class="input input-bordered w-full cursor-text"
+					class="input-bordered input w-full cursor-text"
 					required
 				/>
 			</label>
 			<label class="form-control flex w-full flex-col" for="biz-access-kind">
 				<span class="label-text mb-1">
-					Access<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span>
+					Access<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span>
 				</span>
 				<SearchSelect
 					id="biz-access-kind"
@@ -677,9 +710,8 @@
 			{#if createAccessKind === 'trial'}
 				<label class="form-control flex w-full flex-col" for="biz-trial-duration">
 					<span class="label-text mb-1">
-						Trial duration<span
-							class="text-error align-top text-sm leading-none"
-							aria-hidden="true">*</span
+						Trial duration<span class="align-top text-sm leading-none text-error" aria-hidden="true"
+							>*</span
 						>
 					</span>
 					<SearchSelect
@@ -696,7 +728,7 @@
 			{:else}
 				<label class="form-control flex w-full flex-col" for="biz-plan-key">
 					<span class="label-text mb-1">
-						Plan<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span>
+						Plan<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span>
 					</span>
 					<SearchSelect
 						id="biz-plan-key"
@@ -717,7 +749,7 @@
 					name="image"
 					type="file"
 					accept="image/jpeg,image/png,image/webp,image/gif"
-					class="file-input file-input-bordered w-full cursor-pointer"
+					class="file-input-bordered file-input w-full cursor-pointer"
 					onchange={onImageChange}
 				/>
 				{#if imagePreview}
@@ -732,8 +764,7 @@
 			</label>
 			<label class="form-control flex w-full flex-col" for="biz-template">
 				<span class="label-text mb-1">
-					Template<span class="text-error align-top text-sm leading-none" aria-hidden="true"
-						>*</span
+					Template<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 					>
 				</span>
 				<SearchSelect
@@ -807,32 +838,34 @@
 </dialog>
 
 <dialog bind:this={editDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-lg border bg-base-100 shadow-sm">
-		<h2 class="card-title text-secondary font-bold">Edit business</h2>
+	<div class="modal-box w-11/12 max-w-lg border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="card-title font-bold text-secondary">Edit business</h2>
 		{#if editRow}
 			<p class="text-ink-muted mt-1 text-sm">
-				Slug <code class="text-xs">{editRow.slug}</code> is fixed. Manager invites are managed on
-				Invites.
+				Slug <code class="text-xs">{editRow.slug}</code> is fixed. Manager invites are managed on Invites.
 			</p>
 			<form
 				method="POST"
 				action="?/updateBusiness"
 				enctype="multipart/form-data"
 				class="mt-4 flex flex-col gap-3"
-				use:enhance={bindSubmitting((v) => (editing = v), async ({ result, update }) => {
-					await update();
-					if (result.type === 'success') closeEdit();
-				})}
+				use:enhance={bindSubmitting(
+					(v) => (editing = v),
+					async ({ result, update }) => {
+						await update();
+						if (result.type === 'success') closeEdit();
+					}
+				)}
 			>
 				<input type="hidden" name="businessId" value={editRow.id} />
 				<label class="form-control flex w-full flex-col" for="edit-biz-name">
 					<span class="label-text mb-1">
-						Name<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span>
+						Name<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span>
 					</span>
 					<input
 						id="edit-biz-name"
 						name="name"
-						class="input input-bordered w-full cursor-text"
+						class="input-bordered input w-full cursor-text"
 						value={editRow.name}
 						required
 					/>
@@ -844,7 +877,7 @@
 						name="image"
 						type="file"
 						accept="image/jpeg,image/png,image/webp,image/gif"
-						class="file-input file-input-bordered w-full cursor-pointer"
+						class="file-input-bordered file-input w-full cursor-pointer"
 						onchange={onEditImageChange}
 					/>
 					{#if editImagePreview}
@@ -906,8 +939,7 @@
 				</label>
 				<label class="form-control flex w-full flex-col" for="edit-biz-status">
 					<span class="label-text mb-1">
-						Status<span class="text-error align-top text-sm leading-none" aria-hidden="true"
-							>*</span
+						Status<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 						>
 					</span>
 					<SearchSelect
@@ -923,8 +955,7 @@
 				</label>
 				<label class="form-control flex w-full flex-col" for="edit-biz-access-kind">
 					<span class="label-text mb-1">
-						Access<span class="text-error align-top text-sm leading-none" aria-hidden="true"
-							>*</span
+						Access<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 						>
 					</span>
 					<SearchSelect
@@ -942,7 +973,7 @@
 					<label class="form-control flex w-full flex-col" for="edit-biz-trial-duration">
 						<span class="label-text mb-1">
 							Trial duration<span
-								class="text-error align-top text-sm leading-none"
+								class="align-top text-sm leading-none text-error"
 								aria-hidden="true">*</span
 							>
 						</span>
@@ -960,8 +991,7 @@
 				{:else}
 					<label class="form-control flex w-full flex-col" for="edit-biz-plan">
 						<span class="label-text mb-1">
-							Plan<span class="text-error align-top text-sm leading-none" aria-hidden="true"
-								>*</span
+							Plan<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 							>
 						</span>
 						<SearchSelect
@@ -1009,21 +1039,24 @@
 </dialog>
 
 <dialog bind:this={deleteDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-md border bg-base-100 shadow-sm">
-		<h2 class="card-title text-error font-bold">Delete business</h2>
+	<div class="modal-box w-11/12 max-w-md border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="card-title font-bold text-error">Delete business</h2>
 		{#if deleteRow}
 			<p class="text-ink-muted mt-2 text-sm">
-				Permanently delete <span class="text-base-content font-medium">{deleteRow.name}</span>?
+				Permanently delete <span class="font-medium text-base-content">{deleteRow.name}</span>?
 				Memberships, sites, tickets, and related rows will be removed. Prefer Suspend to keep data.
 			</p>
 			<form
 				method="POST"
 				action="?/deleteBusiness"
 				class="modal-action justify-end"
-				use:enhance={bindSubmitting((v) => (deleting = v), async ({ result, update }) => {
-					await update();
-					if (result.type === 'success') closeDelete();
-				})}
+				use:enhance={bindSubmitting(
+					(v) => (deleting = v),
+					async ({ result, update }) => {
+						await update();
+						if (result.type === 'success') closeDelete();
+					}
+				)}
 			>
 				<input type="hidden" name="businessId" value={deleteRow.id} />
 				<button

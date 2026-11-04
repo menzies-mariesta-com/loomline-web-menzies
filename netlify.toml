@@ -89,3 +89,47 @@
   for = "/auth/*"
   [headers.values]
     X-Robots-Tag = "noindex, nofollow"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
+    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; frame-ancestors 'self'"
+
+[[headers]]
+  for = "/_app/immutable/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/og-nextup.png"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/pricing"
+  [headers.values]
+    Cache-Control = "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/privacy"
+  [headers.values]
+    Cache-Control = "public, max-age=0, s-maxage=86400, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/terms"
+  [headers.values]
+    Cache-Control = "public, max-age=0, s-maxage=86400, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/docs/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400"

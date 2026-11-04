@@ -14,6 +14,7 @@ import {
 	sendManagerInviteEmail
 } from '#lib/server/qms/email';
 import { randomToken } from '#lib/server/qms/ids';
+import { assertEmailAvailable } from '#lib/server/qms/provision-user';
 import { ORIGIN } from '$app/env/private';
 
 const INVITE_ROLES = new Set(['business_owner', 'manager', 'counter_agent', 'guest']);
@@ -69,6 +70,15 @@ export const actions: Actions = {
 		if (pending) {
 			return fail(400, {
 				message: `A pending invite already exists for ${email} on this business.`,
+				success: false
+			});
+		}
+
+		try {
+			await assertEmailAvailable(email);
+		} catch (e) {
+			return fail(400, {
+				message: e instanceof Error ? e.message : 'Email not available',
 				success: false
 			});
 		}
@@ -209,25 +219,30 @@ export const actions: Actions = {
 			return fail(400, { message: 'Invite not found.', success: false });
 		}
 
-		let existingUser = await db.query.user.findFirst({ where: eq(user.email, inv.email) });
-		if (!existingUser) {
-			const userId = randomUUID();
-			const hashed = await hashPassword(password);
-			await db.insert(user).values({
-				id: userId,
-				name: inv.email.split('@')[0] ?? 'Owner',
-				email: inv.email,
-				emailVerified: true
+		const existingUserCheck = await db.query.user.findFirst({ where: eq(user.email, inv.email) });
+		if (existingUserCheck) {
+			return fail(400, {
+				message: 'An account with this email already exists',
+				success: false
 			});
-			await db.insert(account).values({
-				id: randomUUID(),
-				accountId: userId,
-				providerId: 'credential',
-				userId,
-				password: hashed
-			});
-			existingUser = await db.query.user.findFirst({ where: eq(user.email, inv.email) });
 		}
+
+		const userId = randomUUID();
+		const hashed = await hashPassword(password);
+		await db.insert(user).values({
+			id: userId,
+			name: inv.email.split('@')[0] ?? 'Owner',
+			email: inv.email,
+			emailVerified: true
+		});
+		await db.insert(account).values({
+			id: randomUUID(),
+			accountId: userId,
+			providerId: 'credential',
+			userId,
+			password: hashed
+		});
+		const existingUser = await db.query.user.findFirst({ where: eq(user.email, inv.email) });
 		if (!existingUser) return fail(500, { message: 'Could not create user.', success: false });
 
 		const existingMem = await db.query.membership.findFirst({

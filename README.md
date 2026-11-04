@@ -160,7 +160,7 @@ Summarized from `.env.example` (never commit real secrets):
 | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM_SMS` | Optional SMS; console adapter when unset |
 | `CRON_SECRET` | Shared secret for cron/outbox endpoints |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | Optional invite email; logs to console when unset |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_REGION` / `AWS_ENDPOINT_URL_S3` | Neon Object Storage (S3-compatible) for org images |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` / `S3_REGION` / `AWS_ENDPOINT_URL_S3` | Neon Object Storage (S3-compatible) for org images |
 | `ORG_IMAGE_BUCKET` | Bucket name (example default: `uploads`) |
 
 Typed env declarations live in `src/env.ts`.

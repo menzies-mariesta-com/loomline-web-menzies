@@ -1,11 +1,15 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { washRecipes } from '@menzies-mariesta-com/menzies-design-wash-ui/core';
+	import DataTableKeyboard from '#lib/component/own/local/private/data-table/DataTableKeyboard.svelte';
+	import type { TableRowActionsMap } from '#lib/keyboard/types';
 
 	type Legend = {
 		label: string;
 		swatch: string;
 	};
+
+	type Row = { id: string };
 
 	type Props = {
 		title: string;
@@ -24,6 +28,11 @@
 		/** Right join paginator. */
 		paginator?: Snippet;
 		legends?: Legend[];
+		/** Visible page rows for keyboard help (Alt mode). */
+		keyboardRows?: Row[];
+		rowActions?: TableRowActionsMap<Row>;
+		tableId?: string;
+		keyboardRowIndex?: number | null;
 	};
 
 	let {
@@ -36,13 +45,25 @@
 		footerStart,
 		footerSummary,
 		paginator,
-		legends = []
+		legends = [],
+		keyboardRows,
+		rowActions,
+		tableId = 'table',
+		keyboardRowIndex = $bindable(null)
 	}: Props = $props();
 </script>
 
 <div
 	class="border-base-300 rounded-box flex min-h-0 flex-col overflow-hidden border bg-base-100 {washRecipes.tableChrome} {className}"
 >
+	{#if keyboardRows}
+		<DataTableKeyboard
+			rows={keyboardRows}
+			rowActions={rowActions ?? {}}
+			{tableId}
+			bind:keyboardRowIndex
+		/>
+	{/if}
 	<div
 		class="border-base-300 bg-base-100 relative z-10 flex shrink-0 items-center justify-between gap-3 overflow-visible border-b px-3 py-2.5"
 	>

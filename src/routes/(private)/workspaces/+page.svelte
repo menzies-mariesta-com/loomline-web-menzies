@@ -15,21 +15,18 @@
 <ClientShell platformAdmin={data.platformAdmin}>
 	<div class="mx-auto flex w-full max-w-lg flex-col gap-4">
 		<div>
-			<h1 class="card-title text-primary font-bold">{m.workspaces_title()}</h1>
+			<h1 class="card-title font-bold text-primary">{m.workspaces_title()}</h1>
 			<p class="text-ink-muted text-sm">{m.workspaces_pick_lead()}</p>
 		</div>
 
 		{#if data.platformAdmin}
-			<a
-				href={resolve('/admin')}
-				class="btn btn-outline btn-sm w-fit cursor-pointer gap-2"
-			>
+			<a href={resolve('/admin')} class="btn w-fit cursor-pointer gap-2 btn-outline btn-sm">
 				<Shield class="size-4" aria-hidden="true" />
 				{m.common_nextup_admin()}
 			</a>
 		{/if}
 
-		<ul class="menu bg-base-200 rounded-box w-full">
+		<ul class="menu w-full rounded-box bg-base-200">
 			{#each data.memberships as membership (membership.id)}
 				{#if membership.business}
 					<li>

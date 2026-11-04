@@ -1,11 +1,12 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { and, asc, eq, inArray } from 'drizzle-orm';
+import { hashPassword } from 'better-auth/crypto';
 import { db } from '#lib/server/db';
-import { counter, displayDevice, queue, site, user } from '#lib/server/db/schema';
+import { account, counter, displayDevice, queue, site, user } from '#lib/server/db/schema';
 import { requireManager } from '#lib/server/qms/guards';
 import { randomPairingCode } from '#lib/server/qms/ids';
-import { ensureCredentialUser, ensureMembership } from '#lib/server/qms/provision-user';
+import { createCredentialUser, ensureMembership } from '#lib/server/qms/provision-user';
 
 const DEVICE_TYPES = new Set(['tv', 'kiosk', 'agent']);
 
@@ -90,19 +91,39 @@ async function resolveStationAccount(opts: {
 		if (!existing) {
 			return { error: 'Station password required to create a new account' };
 		}
-		await ensureMembership({
-			userId: existing.id,
-			businessId: opts.businessId,
-			role: 'counter_agent'
-		});
-		return {
-			agentUserId: existing.id,
-			note: `Linked existing account ${email}`
-		};
+		if (opts.existingAgentUserId && existing.id === opts.existingAgentUserId) {
+			await ensureMembership({
+				userId: existing.id,
+				businessId: opts.businessId,
+				role: 'counter_agent'
+			});
+			return { agentUserId: existing.id, note: null };
+		}
+		return { error: 'An account with this email already exists' };
+	}
+
+	const existingByEmail = await db.query.user.findFirst({ where: eq(user.email, email) });
+	if (existingByEmail) {
+		if (opts.existingAgentUserId && existingByEmail.id === opts.existingAgentUserId) {
+			const hashed = await hashPassword(password);
+			const cred = await db.query.account.findFirst({
+				where: and(eq(account.userId, existingByEmail.id), eq(account.providerId, 'credential'))
+			});
+			if (cred) {
+				await db.update(account).set({ password: hashed }).where(eq(account.id, cred.id));
+			}
+			await ensureMembership({
+				userId: existingByEmail.id,
+				businessId: opts.businessId,
+				role: 'counter_agent'
+			});
+			return { agentUserId: existingByEmail.id, note: `Updated station account ${email}` };
+		}
+		return { error: 'An account with this email already exists' };
 	}
 
 	try {
-		const provisioned = await ensureCredentialUser({
+		const provisioned = await createCredentialUser({
 			email,
 			password,
 			name: opts.deviceName
@@ -114,9 +135,7 @@ async function resolveStationAccount(opts: {
 		});
 		return {
 			agentUserId: provisioned.id,
-			note: provisioned.created
-				? `Station account created for ${email}`
-				: `Station account linked for ${email}`
+			note: `Station account created for ${email}`
 		};
 	} catch (e) {
 		return { error: e instanceof Error ? e.message : 'Station account failed' };

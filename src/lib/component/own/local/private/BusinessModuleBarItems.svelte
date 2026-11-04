@@ -7,6 +7,8 @@
 	} from '#lib/attachments/floating-panel-portal';
 	import {
 		activeAdministrationPage,
+		filterBusinessModuleBar,
+		filterNavRoleLinks,
 		getBusinessModuleBar,
 		isBusinessNavActive,
 		type BusinessNavModule,
@@ -23,7 +25,15 @@
 	let { businessId, role, navBarControlBorder, stripScrollToken = 0 }: Props = $props();
 
 	const path = $derived(page.url.pathname);
-	const model = $derived(getBusinessModuleBar(businessId, role));
+	const allowedPaths = $derived(
+		new Set((page.data as { allowedPaths?: string[] }).allowedPaths ?? [])
+	);
+	const model = $derived(
+		filterBusinessModuleBar(
+			filterNavRoleLinks(getBusinessModuleBar(businessId, role), role),
+			allowedPaths
+		)
+	);
 
 	let hoveredModuleId = $state<string | null>(null);
 	let moduleMenuPos = $state({ top: 0, left: 0 });

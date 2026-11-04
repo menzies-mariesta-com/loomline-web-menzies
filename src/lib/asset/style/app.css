@@ -514,3 +514,72 @@ details.dropdown:not([open]) > .dropdown-content {
 .menzies-table-scroll td:not(.menzies-table-actions-col) .truncate {
 	max-width: 100%;
 }
+
+.menzies-kbd-help {
+	position: absolute;
+	top: -0.2rem;
+	right: -0.2rem;
+	z-index: 30;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.12rem;
+	pointer-events: none;
+}
+.menzies-kbd-help--center {
+	top: 50%;
+	left: 50%;
+	right: auto;
+	transform: translate(-50%, -50%);
+}
+.menzies-kbd-help__cap {
+	display: inline-flex;
+	min-width: 1.1rem;
+	align-items: center;
+	justify-content: center;
+	border-radius: 0.2rem;
+	border: 1px solid color-mix(in oklch, var(--color-neutral-content) 25%, transparent);
+	background: color-mix(in oklch, var(--color-neutral) 92%, var(--color-base-content) 8%);
+	color: var(--color-neutral-content);
+	padding: 0.05rem 0.28rem;
+	font-family: var(--font-mono, ui-monospace, monospace);
+	font-size: 0.62rem;
+	font-weight: 700;
+	line-height: 1.1;
+	box-shadow: 0 1px 2px color-mix(in oklch, var(--color-base-content) 18%, transparent);
+}
+.menzies-kbd-help__sep {
+	font-size: 0.5rem;
+	font-weight: 600;
+	opacity: 0.65;
+}
+.menzies-kbd-help-active tr[data-kbd-row-slot] {
+	position: relative;
+}
+.menzies-kbd-help-active tr[data-kbd-row-slot] > td:first-child {
+	position: relative;
+}
+.menzies-kbd-help-active tr[data-kbd-row-slot] > td:first-child::before {
+	content: attr(data-kbd-row-slot);
+	position: absolute;
+	top: 0.15rem;
+	left: 0.15rem;
+	z-index: 5;
+	display: inline-flex;
+	min-width: 1rem;
+	align-items: center;
+	justify-content: center;
+	border-radius: 0.2rem;
+	background: color-mix(in oklch, var(--color-neutral) 92%, var(--color-base-content) 8%);
+	color: var(--color-neutral-content);
+	font-family: var(--font-mono, ui-monospace, monospace);
+	font-size: 0.62rem;
+	font-weight: 700;
+	padding: 0.05rem 0.25rem;
+	pointer-events: none;
+	box-shadow: 0 1px 2px color-mix(in oklch, var(--color-base-content) 15%, transparent);
+}
+
+tr[data-kbd-row-focus='true'] {
+	outline: 2px solid color-mix(in oklch, var(--color-primary) 55%, transparent);
+	outline-offset: -2px;
+}

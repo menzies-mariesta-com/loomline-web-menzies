@@ -1,7 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Fullscreen, Minimize } from '@lucide/svelte';
-	import { renderVoiceTemplate, speakAnnouncement } from '#lib/util/voice';
+	import {
+		buildAnnounceSegments,
+		speakAnnouncement,
+		ticketCallAnnounceKey,
+		unlockSpeechForUserGesture,
+		type AnnounceVoiceConfig
+	} from '#lib/util/voice';
 
 	type DisplayTicket = {
 		id: string;
@@ -11,6 +17,7 @@
 		queueId: string;
 		priority?: number;
 		sequence?: number;
+		calledAt?: string | null;
 	};
 
 	type DisplaySnapshot = {
@@ -19,6 +26,7 @@
 		missed?: DisplayTicket[];
 		waitingByQueue?: Record<string, number>;
 		queues?: { id: string; name: string }[];
+		voice?: AnnounceVoiceConfig;
 		updatedAt?: string;
 	};
 
@@ -28,12 +36,16 @@
 	$effect(() => {
 		snapshot = data.snapshot as DisplaySnapshot;
 	});
-	let lastAnnounced = $state('');
+	let lastAnnouncedKey = $state('');
 	let isFullscreen = $state(false);
 	let reducedMotion = $state(false);
 	let boardEl = $state<HTMLElement | null>(null);
 
 	const boundQueueIds = $derived(data.boundQueueIds ?? []);
+
+	const voiceConfig = $derived.by((): AnnounceVoiceConfig => {
+		return (snapshot.voice ?? data.voiceConfig) as AnnounceVoiceConfig;
+	});
 
 	function inBoundQueues(t: DisplayTicket) {
 		if (!boundQueueIds.length) return true;
@@ -45,24 +57,28 @@
 	const missed = $derived((snapshot.missed ?? []).filter(inBoundQueues).slice(0, 12));
 
 	function announce(number: string, counterLabel: string) {
-		const text = renderVoiceTemplate(data.voiceTemplate, {
-			number,
-			counter: counterLabel || 'counter'
-		});
+		const cfg = voiceConfig;
 		void speakAnnouncement({
-			text,
-			locales: data.announceLocales ?? ['en'],
-			repeat: data.announceRepeat ?? 1
+			segments: buildAnnounceSegments({
+				locales: cfg.announceLocales,
+				templates: cfg.templates,
+				vars: { number, counter: counterLabel || 'counter' },
+				localeVoices: cfg.speech.localeVoices
+			}),
+			repeat: cfg.announceRepeat,
+			repeatDelayMs: cfg.announceRepeatDelayMs,
+			speech: cfg.speech
 		});
 	}
 
 	function maybeAnnounce(json: DisplaySnapshot) {
 		const list = (json.nowServing ?? []).filter(inBoundQueues);
 		const top = list[0];
-		if (top && top.id !== lastAnnounced && (top.status === 'called' || top.status === 'serving')) {
-			lastAnnounced = top.id;
-			announce(top.number, data.counterMap[top.counterId ?? ''] ?? '');
-		}
+		if (!top || (top.status !== 'called' && top.status !== 'serving')) return;
+		const key = ticketCallAnnounceKey(top);
+		if (key === lastAnnouncedKey) return;
+		lastAnnouncedKey = key;
+		announce(top.number, data.counterMap[top.counterId ?? ''] ?? '');
 	}
 
 	async function refresh() {
@@ -100,11 +116,13 @@
 
 	async function toggleFullscreen(e?: Event) {
 		e?.stopPropagation();
+		unlockSpeechForUserGesture();
 		if (document.fullscreenElement) await exitFullscreen();
 		else await enterFullscreen();
 	}
 
 	function onBoardClick(e: MouseEvent) {
+		unlockSpeechForUserGesture();
 		const target = e.target as HTMLElement | null;
 		if (target?.closest('[data-fs-control]')) return;
 		if (!document.fullscreenElement) void enterFullscreen();
@@ -121,6 +139,8 @@
 		};
 		document.addEventListener('fullscreenchange', onFs);
 		onFs();
+
+		maybeAnnounce(snapshot);
 
 		const sse = new EventSource(`/api/realtime/site/${data.siteId}`);
 		sse.onmessage = (ev) => {
@@ -141,6 +161,7 @@
 			document.removeEventListener('fullscreenchange', onFs);
 			sse.close();
 			clearInterval(poll);
+			window.speechSynthesis?.cancel();
 		};
 	});
 </script>

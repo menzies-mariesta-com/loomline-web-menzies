@@ -1,23 +1,15 @@
 import type { Component } from 'svelte';
 import {
-	MapPin,
-	Briefcase,
-	Monitor,
-	ListOrdered,
 	Ticket,
 	CalendarDays,
-	Tablet,
-	Users,
 	Headset,
-	Settings2,
-	UserRound,
-	Building2,
-	ArrowRightLeft,
-	GitBranch,
-	Logs,
-	Settings
+	UserRound
 } from '@lucide/svelte';
+import LucideUserCog from '#lib/component/own/library/lucide/LucideUserCog.svelte';
 import { m } from '#lib/paraglide/messages';
+import {
+	administrationPageTemplates
+} from '#lib/tool/business-console-pages';
 
 export type BusinessNavLink = {
 	href: string;
@@ -60,47 +52,47 @@ function operationalLinks(base: string): BusinessNavLink[] {
 }
 
 function administrationModule(base: string): BusinessNavModule {
+	const groups: BusinessNavPageGroup[] = [];
+	const groupOrder: string[] = [];
+	const groupPages = new Map<string, BusinessNavPage[]>();
+	for (const tpl of administrationPageTemplates()) {
+		const gl = tpl.groupLabel();
+		if (!groupPages.has(gl)) {
+			groupOrder.push(gl);
+			groupPages.set(gl, []);
+		}
+		groupPages.get(gl)!.push({
+			href: `${base}${tpl.pathSuffix}`,
+			label: tpl.pageLabel()
+		});
+	}
+	for (const label of groupOrder) {
+		groups.push({ label, pages: groupPages.get(label) ?? [] });
+	}
+
 	return {
 		id: 'administration',
 		label: m.nav_administration(),
-		icon: Settings,
-		groups: [
-			{
-				label: m.nav_group_floor_setup(),
-				pages: [
-					{ href: `${base}/sites`, label: m.nav_sites() },
-					{ href: `${base}/services`, label: m.nav_services() },
-					{ href: `${base}/queues`, label: m.nav_queues() },
-					{ href: `${base}/counters`, label: m.nav_counters() },
-					{ href: `${base}/devices`, label: m.nav_devices() }
-				]
-			},
-			{
-				label: m.nav_group_routing(),
-				pages: [
-					{ href: `${base}/departments`, label: m.nav_departments() },
-					{ href: `${base}/destinations`, label: m.nav_destinations() },
-					{ href: `${base}/timelines`, label: m.nav_timelines() }
-				]
-			},
-			{
-				label: m.nav_group_business(),
-				pages: [
-					{ href: `${base}/team`, label: m.nav_team() },
-					{ href: `${base}/config`, label: m.nav_config() },
-					{ href: `${base}/logs`, label: m.nav_logs() }
-				]
-			}
-		]
+		icon: LucideUserCog,
+		groups
 	};
 }
+
+const STAFF_ROLE_SET = new Set([
+	'platform_admin',
+	'business_owner',
+	'business_admin',
+	'manager',
+	'counter_agent'
+]);
+const MANAGE_ROLE_SET = new Set(['platform_admin', 'business_owner', 'business_admin', 'manager']);
 
 /** Module bar: Administration dropdown first, then floor operations. Overview is the home icon only. */
 export function getBusinessModuleBar(businessId: string, role: string): BusinessModuleBarModel {
 	const base = `/b/${businessId}`;
-	const isStaff = ['platform_admin', 'business_owner', 'manager', 'counter_agent'].includes(role);
+	const isStaff = STAFF_ROLE_SET.has(role);
 	const isGuest = role === 'guest';
-	const canManage = ['platform_admin', 'business_owner', 'manager'].includes(role);
+	const canManage = MANAGE_ROLE_SET.has(role);
 	const isCounterAgent = role === 'counter_agent';
 
 	if (isGuest) {
@@ -218,4 +210,67 @@ export function resolveClientPageTitle(
 	const last = segments.at(-1);
 	if (!last || last === opts.businessId) return m.nav_overview();
 	return titleCaseSegment(last);
+}
+
+export type BusinessPageSearchOption = {
+	value: string;
+	label: string;
+};
+
+/** Flat command-palette entries for module bar search (Medora pageSearchOptions). */
+export function buildBusinessPageSearchOptions(
+	businessId: string,
+	role: string
+): BusinessPageSearchOption[] {
+	const base = `/b/${businessId}`;
+	const { modules, links } = getBusinessModuleBar(businessId, role);
+	const out: BusinessPageSearchOption[] = [{ value: base, label: m.nav_overview() }];
+
+	for (const link of links) {
+		out.push({ value: link.href, label: link.label });
+	}
+
+	for (const mod of modules) {
+		for (const group of mod.groups) {
+			for (const page of group.pages) {
+				const labelParts = [page.label, mod.label, group.label].filter((part) => part.length > 0);
+				out.push({ value: page.href, label: labelParts.join(' · ') });
+			}
+		}
+	}
+
+	return out;
+}
+
+export function filterBusinessModuleBar(
+	model: BusinessModuleBarModel,
+	allowedPaths: Set<string> | string[]
+): BusinessModuleBarModel {
+	const allowed = allowedPaths instanceof Set ? allowedPaths : new Set(allowedPaths);
+	const links = model.links.filter((link) => allowed.has(link.href));
+	const modules = model.modules
+		.map((mod) => ({
+			...mod,
+			groups: mod.groups
+				.map((group) => ({
+					...group,
+					pages: group.pages.filter((page) => allowed.has(page.href))
+				}))
+				.filter((group) => group.pages.length > 0)
+		}))
+		.filter((mod) => mod.groups.length > 0);
+	return { modules, links };
+}
+
+export function filterNavRoleLinks(
+	model: BusinessModuleBarModel,
+	role: string
+): BusinessModuleBarModel {
+	if (role === 'counter_agent') {
+		return { modules: [], links: model.links.filter((l) => l.href.endsWith('/agent')) };
+	}
+	if (role === 'guest') {
+		return { modules: [], links: model.links.filter((l) => l.href.endsWith('/guest')) };
+	}
+	return model;
 }

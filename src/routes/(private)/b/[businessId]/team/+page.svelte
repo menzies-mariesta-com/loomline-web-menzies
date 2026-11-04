@@ -1,23 +1,21 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import {
-		CircleCheck,
-		CircleX,
-		Mail,
-		MailPlus,
-		RefreshCw,
-		UserPlus,
-		Users
-	} from '@lucide/svelte';
+	import { CircleCheck, CircleX, Mail, MailPlus, RefreshCw, UserPlus, Users } from '@lucide/svelte';
 	import { washRecipes } from '@menzies-mariesta-com/menzies-design-wash-ui/core';
 	import { bindSubmitting } from '#lib/tool/form-submit';
 	import { shortDateTime } from '#lib/util/format';
 	import DataTableShell from '#lib/component/own/local/private/data-table/DataTableShell.svelte';
+	import { buildCrudRowActions } from '#lib/keyboard/table-actions';
+
 	import SearchSelect from '#lib/component/own/local/private/SearchSelect.svelte';
 	import ToastDismissButton from '#lib/component/own/local/private/ToastDismissButton.svelte';
 	import IconActionTip from '#lib/component/wash/tooltip/IconActionTip.svelte';
 	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
+	import WashActionKbd from '#lib/component/own/local/keyboard/WashActionKbd.svelte';
+	import ShortcutTarget from '#lib/component/own/local/keyboard/ShortcutTarget.svelte';
+	import { registerDataTableHeaderShortcuts } from '#lib/keyboard/page-table-shortcuts';
+	import { m } from '#lib/paraglide/messages';
 
 	let { data, form } = $props();
 
@@ -88,8 +86,7 @@
 			const name = m.user?.name ?? '';
 			const email = m.user?.email ?? m.userId;
 			const q = nameFilter.trim().toLowerCase();
-			const nameOk =
-				!q || name.toLowerCase().includes(q) || email.toLowerCase().includes(q);
+			const nameOk = !q || name.toLowerCase().includes(q) || email.toLowerCase().includes(q);
 			const emailOk =
 				!emailFilter.trim() || email.toLowerCase().includes(emailFilter.trim().toLowerCase());
 			const roleOk = !roleFilter || m.role === roleFilter;
@@ -235,6 +232,11 @@
 		provisionDialog?.showModal();
 	}
 
+	let keyboardRowIndex = $state<number | null>(null);
+	const inviteTableActions = $derived(
+		buildCrudRowActions({ onView: (row: InviteRow) => openProvision(row) })
+	);
+
 	function closeProvision() {
 		provisionDialog?.close();
 		provisionRow = null;
@@ -280,10 +282,7 @@
 			if (form.success) {
 				closeInvite();
 				closeProvision();
-				if (
-					typeof form.message === 'string' &&
-					/^invite\b/i.test(form.message.trim())
-				) {
+				if (typeof form.message === 'string' && /^invite\b/i.test(form.message.trim())) {
 					listView = 'invites';
 					inviteStatusFilter = 'pending';
 				}
@@ -300,6 +299,14 @@
 		ro.observe(bodyEl);
 		return () => ro.disconnect();
 	});
+
+	$effect(() => {
+		const off = registerDataTableHeaderShortcuts('team-invites', {
+			onRefresh: () => void handleRefresh(),
+			refreshDisabled: () => refreshing
+		});
+		return off;
+	});
 </script>
 
 <svelte:head>
@@ -308,7 +315,7 @@
 </svelte:head>
 
 {#if form?.message && !toastGone}
-	<div class="toast toast-bottom toast-end z-[100]">
+	<div class="toast toast-end toast-bottom z-[100]">
 		<div
 			class="alert shadow-lg"
 			class:alert-success={form.success}
@@ -331,7 +338,7 @@
 			<button
 				type="button"
 				role="tab"
-				class="tab gap-1.5 cursor-pointer"
+				class="tab cursor-pointer gap-1.5"
 				class:tab-active={listView === 'members'}
 				aria-selected={listView === 'members'}
 				onclick={() => setListView('members')}
@@ -343,7 +350,7 @@
 			<button
 				type="button"
 				role="tab"
-				class="tab gap-1.5 cursor-pointer"
+				class="tab cursor-pointer gap-1.5"
 				class:tab-active={listView === 'invites'}
 				aria-selected={listView === 'invites'}
 				onclick={() => setListView('invites')}
@@ -360,45 +367,51 @@
 	</div>
 
 	<DataTableShell
+		keyboardRows={listView === 'invites' ? pageInvites : undefined}
+		rowActions={listView === 'invites' ? inviteTableActions : undefined}
+		tableId="team-invites"
+		bind:keyboardRowIndex
 		title="Team"
 		description={shellDescription}
 		bind:bodyEl
-		footerSummary={footerSummary}
+		{footerSummary}
 	>
 		{#snippet headerActions()}
 			<WashTooltip tooltipText="Refresh" className="tooltip-secondary">
-<button
-					type="button"
-					class="btn btn-ghost btn-square btn-sm btn-secondary"
-					class:cursor-pointer={!refreshing}
-					class:cursor-not-allowed={refreshing}
-					class:btn-disabled={refreshing}
-					class:loading={refreshing}
-					aria-label="Refresh"
-					aria-busy={refreshing}
-					disabled={refreshing}
-					onclick={() => void handleRefresh()}
-				>
-					{#if !refreshing}
-						<RefreshCw class="size-4" aria-hidden="true" />
-					{/if}
-				</button>
-</WashTooltip>
+				<ShortcutTarget keys={['R']} label={m.keyboard_action_refresh()}>
+					<button
+						type="button"
+						class="btn btn-square btn-ghost btn-secondary btn-sm"
+						class:cursor-pointer={!refreshing}
+						class:cursor-not-allowed={refreshing}
+						class:btn-disabled={refreshing}
+						class:loading={refreshing}
+						aria-label="Refresh"
+						aria-busy={refreshing}
+						disabled={refreshing}
+						onclick={() => void handleRefresh()}
+					>
+						{#if !refreshing}
+							<RefreshCw class="size-4" aria-hidden="true" />
+						{/if}
+					</button>
+				</ShortcutTarget>
+			</WashTooltip>
 			<WashTooltip tooltipText="Invite" className="tooltip-primary">
-<button
+				<button
 					type="button"
-					class="btn btn-ghost btn-square btn-sm btn-primary cursor-pointer"
+					class="btn btn-square cursor-pointer btn-ghost btn-primary btn-sm"
 					aria-label="Invite"
 					onclick={openInvite}
 				>
 					<UserPlus class="size-4" aria-hidden="true" />
 				</button>
-</WashTooltip>
+			</WashTooltip>
 		{/snippet}
 
 		{#if listView === 'members'}
-			<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
-				<thead class="bg-base-100 sticky top-0 z-10">
+			<table class="table w-full table-zebra [&_tbody_tr]:hover:bg-primary/40">
+				<thead class="sticky top-0 z-10 bg-base-100">
 					<tr>
 						<th>No</th>
 						<th>Name</th>
@@ -412,7 +425,7 @@
 						<th>
 							<input
 								type="text"
-								class="input input-xs input-bordered w-full max-w-[10rem] cursor-text"
+								class="input-bordered input w-full max-w-[10rem] cursor-text input-xs"
 								placeholder="Filter…"
 								aria-label="Filter by name"
 								bind:value={nameFilter}
@@ -421,7 +434,7 @@
 						<th>
 							<input
 								type="text"
-								class="input input-xs input-bordered w-full max-w-[10rem] cursor-text"
+								class="input-bordered input w-full max-w-[10rem] cursor-text input-xs"
 								placeholder="Filter…"
 								aria-label="Filter by email"
 								bind:value={emailFilter}
@@ -463,18 +476,18 @@
 								{#if data.members.length === 0}
 									<div class="mx-auto flex max-w-sm flex-col items-center gap-3">
 										<span
-											class="bg-primary/10 text-primary inline-flex size-12 items-center justify-center rounded-full"
+											class="inline-flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary"
 											aria-hidden="true"
 										>
 											<Users class="size-6" />
 										</span>
-										<p class="text-base-content text-sm font-medium">No team members yet</p>
+										<p class="text-sm font-medium text-base-content">No team members yet</p>
 										<p class="text-ink-muted text-xs">
 											Invite a manager or counter agent so they can help run the queue.
 										</p>
 										<button
 											type="button"
-											class="btn btn-primary btn-sm cursor-pointer"
+											class="btn cursor-pointer btn-primary btn-sm"
 											onclick={openInvite}
 										>
 											<UserPlus class="size-4" aria-hidden="true" />
@@ -498,7 +511,7 @@
 								<td>
 									<span class={memberStatusBadge(m.status)}>{memberStatusLabel(m.status)}</span>
 								</td>
-								<td class="text-ink-muted whitespace-nowrap text-sm"
+								<td class="text-ink-muted text-sm whitespace-nowrap"
 									>{shortDateTime(m.createdAt)}</td
 								>
 							</tr>
@@ -507,8 +520,8 @@
 				</tbody>
 			</table>
 		{:else}
-			<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
-				<thead class="bg-base-100 sticky top-0 z-10">
+			<table class="table w-full table-zebra [&_tbody_tr]:hover:bg-primary/40">
+				<thead class="sticky top-0 z-10 bg-base-100">
 					<tr>
 						<th>Actions</th>
 						<th>No</th>
@@ -524,7 +537,7 @@
 						<th>
 							<input
 								type="text"
-								class="input input-xs input-bordered w-full max-w-[10rem] cursor-text"
+								class="input-bordered input w-full max-w-[10rem] cursor-text input-xs"
 								placeholder="Filter…"
 								aria-label="Filter by email"
 								bind:value={inviteEmailFilter}
@@ -567,18 +580,18 @@
 								{#if data.invites.length === 0}
 									<div class="mx-auto flex max-w-sm flex-col items-center gap-3">
 										<span
-											class="bg-secondary/10 text-secondary inline-flex size-12 items-center justify-center rounded-full"
+											class="inline-flex size-12 items-center justify-center rounded-full bg-secondary/10 text-secondary"
 											aria-hidden="true"
 										>
 											<MailPlus class="size-6" />
 										</span>
-										<p class="text-base-content text-sm font-medium">No invites yet</p>
+										<p class="text-sm font-medium text-base-content">No invites yet</p>
 										<p class="text-ink-muted text-xs">
 											Send an email invite. They get a link to set a password and join.
 										</p>
 										<button
 											type="button"
-											class="btn btn-primary btn-sm cursor-pointer"
+											class="btn cursor-pointer btn-primary btn-sm"
 											onclick={openInvite}
 										>
 											<UserPlus class="size-4" aria-hidden="true" />
@@ -592,7 +605,11 @@
 						</tr>
 					{:else}
 						{#each pageInvites as inv, i (inv.id)}
-							<tr>
+							<tr
+								data-kbd-row-id={inv.id}
+								data-kbd-row-slot={String(i + 1)}
+								data-kbd-row-focus={keyboardRowIndex === i ? 'true' : undefined}
+							>
 								<td>
 									{#if inv.status === 'pending'}
 										<div class="flex items-center gap-0.5">
@@ -608,9 +625,9 @@
 											>
 												<input type="hidden" name="inviteId" value={inv.id} />
 												<IconActionTip tip="Resend set-password email" tone="secondary">
-<button
+													<button
 														type="submit"
-														class="btn btn-ghost btn-square btn-xs btn-secondary"
+														class="btn btn-square btn-ghost btn-secondary btn-xs"
 														class:cursor-pointer={busyInviteId !== inv.id}
 														class:cursor-not-allowed={busyInviteId === inv.id}
 														class:loading={busyInviteId === inv.id}
@@ -623,19 +640,19 @@
 														{/if}
 													</button>
 												</IconActionTip>
-
 											</form>
-											<IconActionTip tip="Provision" tone="secondary">
-<button
-													type="button"
-													class="btn btn-ghost btn-square btn-xs btn-secondary cursor-pointer"
-													aria-label="Provision"
-													onclick={() => openProvision(inv)}
-												>
-													<UserPlus class="size-3.5" aria-hidden="true" />
-												</button>
-											</IconActionTip>
-
+											<WashActionKbd key="v">
+												<IconActionTip tip="Provision" tone="secondary">
+													<button
+														type="button"
+														class="btn btn-square cursor-pointer btn-ghost btn-secondary btn-xs"
+														aria-label="Provision"
+														onclick={() => openProvision(inv)}
+													>
+														<UserPlus class="size-3.5" aria-hidden="true" />
+													</button>
+												</IconActionTip>
+											</WashActionKbd>
 										</div>
 									{:else}
 										<span class="text-ink-muted text-xs">-</span>
@@ -647,14 +664,12 @@
 									<span class={roleBadgeClass(inv.role)}>{roleLabel(inv.role)}</span>
 								</td>
 								<td>
-									<span class={inviteStatusBadge(inv.status)}
-										>{inviteStatusLabel(inv.status)}</span
-									>
+									<span class={inviteStatusBadge(inv.status)}>{inviteStatusLabel(inv.status)}</span>
 								</td>
-								<td class="text-ink-muted whitespace-nowrap text-sm"
+								<td class="text-ink-muted text-sm whitespace-nowrap"
 									>{shortDateTime(inv.expiresAt)}</td
 								>
-								<td class="text-ink-muted whitespace-nowrap text-sm"
+								<td class="text-ink-muted text-sm whitespace-nowrap"
 									>{shortDateTime(inv.createdAt)}</td
 								>
 							</tr>
@@ -689,7 +704,7 @@
 			<div class="join">
 				<button
 					type="button"
-					class="btn btn-sm join-item"
+					class="btn join-item btn-sm"
 					class:cursor-pointer={safePage > 1}
 					class:cursor-not-allowed={safePage <= 1}
 					disabled={safePage <= 1}
@@ -700,7 +715,7 @@
 				{#each pageButtons as p (p)}
 					<button
 						type="button"
-						class="btn btn-sm join-item cursor-pointer"
+						class="btn join-item cursor-pointer btn-sm"
 						class:btn-active={p === safePage}
 						onclick={() => (page = p)}
 					>
@@ -709,7 +724,7 @@
 				{/each}
 				<button
 					type="button"
-					class="btn btn-sm join-item"
+					class="btn join-item btn-sm"
 					class:cursor-pointer={safePage < totalPages}
 					class:cursor-not-allowed={safePage >= totalPages}
 					disabled={safePage >= totalPages}
@@ -723,8 +738,8 @@
 </div>
 
 <dialog bind:this={inviteDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-lg border bg-base-100 shadow-sm">
-		<h2 class="card-title text-primary font-bold">Invite teammate</h2>
+	<div class="modal-box w-11/12 max-w-lg border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="card-title font-bold text-primary">Invite teammate</h2>
 		<p class="text-ink-muted mt-1 text-sm">
 			We email a set-password link. They set a password and appear under Members once accepted.
 		</p>
@@ -732,36 +747,39 @@
 			method="POST"
 			action="?/invite"
 			class="mt-4 flex flex-col gap-3"
-			use:enhance={bindSubmitting((v) => (inviting = v), async ({ result, update }) => {
-				await update();
-				if (
-					result.type === 'success' &&
-					result.data &&
-					typeof result.data === 'object' &&
-					'success' in result.data &&
-					result.data.success
-				) {
-					closeInvite();
+			use:enhance={bindSubmitting(
+				(v) => (inviting = v),
+				async ({ result, update }) => {
+					await update();
+					if (
+						result.type === 'success' &&
+						result.data &&
+						typeof result.data === 'object' &&
+						'success' in result.data &&
+						result.data.success
+					) {
+						closeInvite();
+					}
 				}
-			})}
+			)}
 		>
 			<label class="form-control flex w-full flex-col" for="team-invite-email">
 				<span class="label-text mb-1">
-					Email<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span>
+					Email<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span>
 				</span>
 				<input
 					id="team-invite-email"
 					name="email"
 					type="email"
 					autocomplete="email"
-					class="input input-bordered w-full cursor-text"
+					class="input-bordered input w-full cursor-text"
 					placeholder="colleague@example.com"
 					required
 				/>
 			</label>
 			<label class="form-control flex w-full flex-col" for="team-invite-role">
 				<span class="label-text mb-1">
-					Role<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span>
+					Role<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span>
 				</span>
 				<SearchSelect
 					id="team-invite-role"
@@ -809,39 +827,41 @@
 </dialog>
 
 <dialog bind:this={provisionDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-md border bg-base-100 shadow-sm">
-		<h2 class="card-title text-secondary font-bold">Provision account</h2>
+	<div class="modal-box w-11/12 max-w-md border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="card-title font-bold text-secondary">Provision account</h2>
 		{#if provisionRow}
 			<p class="text-ink-muted mt-1 text-sm">
 				Create or link an account for
-				<span class="text-base-content font-medium">{provisionRow.email}</span>
+				<span class="font-medium text-base-content">{provisionRow.email}</span>
 				as {roleLabel(provisionRow.role).toLowerCase()}, then mark the invite accepted.
 			</p>
 			<form
 				method="POST"
 				action="?/provision"
 				class="mt-4 flex flex-col gap-3"
-				use:enhance={bindSubmitting((v) => (provisioning = v), async ({ result, update }) => {
-					await update();
-					if (result.type === 'success') {
-						closeProvision();
-						listView = 'members';
+				use:enhance={bindSubmitting(
+					(v) => (provisioning = v),
+					async ({ result, update }) => {
+						await update();
+						if (result.type === 'success') {
+							closeProvision();
+							listView = 'members';
+						}
 					}
-				})}
+				)}
 			>
 				<input type="hidden" name="inviteId" value={provisionRow.id} />
 				<label class="form-control flex w-full flex-col" for="team-provision-password">
 					<span class="label-text mb-1">
-						Temp password<span
-							class="text-error align-top text-sm leading-none"
-							aria-hidden="true">*</span
+						Temp password<span class="align-top text-sm leading-none text-error" aria-hidden="true"
+							>*</span
 						>
 					</span>
 					<input
 						id="team-provision-password"
 						name="password"
 						type="text"
-						class="input input-bordered w-full cursor-text"
+						class="input-bordered input w-full cursor-text"
 						value="TempPass1!"
 						required
 					/>

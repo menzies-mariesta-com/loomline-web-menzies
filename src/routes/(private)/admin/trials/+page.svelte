@@ -1,25 +1,24 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import {
-		Check,
-		CircleCheck,
-		CircleX,
-		RefreshCw,
-		Trash2,
-		X
-	} from '@lucide/svelte';
+	import { Check, CircleCheck, CircleX, RefreshCw, Trash2, X } from '@lucide/svelte';
 	import { washRecipes } from '@menzies-mariesta-com/menzies-design-wash-ui/core';
 	import { bindSubmitting } from '#lib/tool/form-submit';
 	import { shortDateTime } from '#lib/util/format';
 	import { inDateRange } from '#lib/util/date-range';
 	import { trialDurationLabel } from '#lib/tool/plans';
 	import DataTableShell from '#lib/component/own/local/private/data-table/DataTableShell.svelte';
+	import { buildCrudRowActions } from '#lib/keyboard/table-actions';
+
 	import DateRangeFilter from '#lib/component/own/local/private/data-table/DateRangeFilter.svelte';
 	import SearchSelect from '#lib/component/own/local/private/SearchSelect.svelte';
 	import ToastDismissButton from '#lib/component/own/local/private/ToastDismissButton.svelte';
 	import IconActionTip from '#lib/component/wash/tooltip/IconActionTip.svelte';
 	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
+	import WashActionKbd from '#lib/component/own/local/keyboard/WashActionKbd.svelte';
+	import ShortcutTarget from '#lib/component/own/local/keyboard/ShortcutTarget.svelte';
+	import { registerDataTableHeaderShortcuts } from '#lib/keyboard/page-table-shortcuts';
+	import { m } from '#lib/paraglide/messages';
 
 	let { data, form } = $props();
 
@@ -45,9 +44,7 @@
 	let approveTemplateId = $state('');
 	let approveConfigId = $state('');
 
-	const templateOptions = $derived(
-		data.templates.map((t) => ({ value: t.id, label: t.name }))
-	);
+	const templateOptions = $derived(data.templates.map((t) => ({ value: t.id, label: t.name })));
 	const configOptions = $derived(
 		data.configs.map((c) => ({ value: c.id, label: `${c.name} (${c.timezone})` }))
 	);
@@ -74,6 +71,9 @@
 	const totalPages = $derived(Math.max(1, Math.ceil(filtered.length / pageSize)));
 	const safePage = $derived(Math.min(page, totalPages));
 	const pageRows = $derived(filtered.slice((safePage - 1) * pageSize, safePage * pageSize));
+	let keyboardRowIndex = $state<number | null>(null);
+	const tableRowActions = $derived(buildCrudRowActions({ onDelete: openDelete }));
+
 	const showingFrom = $derived(filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1);
 	const showingTo = $derived(Math.min(safePage * pageSize, filtered.length));
 	const footerSummary = $derived(
@@ -163,6 +163,14 @@
 		ro.observe(bodyEl);
 		return () => ro.disconnect();
 	});
+
+	$effect(() => {
+		const off = registerDataTableHeaderShortcuts('admin-trials', {
+			onRefresh: () => void handleRefresh(),
+			refreshDisabled: () => refreshing
+		});
+		return off;
+	});
 </script>
 
 <svelte:head>
@@ -172,7 +180,7 @@
 
 <div class="flex min-h-0 flex-1 flex-col">
 	{#if form?.message && !toastGone}
-		<div class="toast toast-bottom toast-end z-[100]">
+		<div class="toast toast-end toast-bottom z-[100]">
 			<div
 				class="alert shadow-lg"
 				class:alert-success={form.success}
@@ -189,30 +197,40 @@
 		</div>
 	{/if}
 
-	<DataTableShell title="Trial requests" bind:bodyEl footerSummary={footerSummary}>
+	<DataTableShell
+		keyboardRows={pageRows}
+		rowActions={tableRowActions}
+		tableId="admin-trials"
+		bind:keyboardRowIndex
+		title="Trial requests"
+		bind:bodyEl
+		{footerSummary}
+	>
 		{#snippet headerActions()}
 			<WashTooltip tooltipText="Refresh" className="tooltip-secondary">
-<button
-					type="button"
-					class="btn btn-ghost btn-square btn-sm btn-secondary"
-					class:cursor-pointer={!refreshing}
-					class:cursor-not-allowed={refreshing}
-					class:btn-disabled={refreshing}
-					class:loading={refreshing}
-					aria-label="Refresh"
-					aria-busy={refreshing}
-					disabled={refreshing}
-					onclick={() => void handleRefresh()}
-				>
-					{#if !refreshing}
-						<RefreshCw class="size-4" aria-hidden="true" />
-					{/if}
-				</button>
-</WashTooltip>
+				<ShortcutTarget keys={['R']} label={m.keyboard_action_refresh()}>
+					<button
+						type="button"
+						class="btn btn-square btn-ghost btn-secondary btn-sm"
+						class:cursor-pointer={!refreshing}
+						class:cursor-not-allowed={refreshing}
+						class:btn-disabled={refreshing}
+						class:loading={refreshing}
+						aria-label="Refresh"
+						aria-busy={refreshing}
+						disabled={refreshing}
+						onclick={() => void handleRefresh()}
+					>
+						{#if !refreshing}
+							<RefreshCw class="size-4" aria-hidden="true" />
+						{/if}
+					</button>
+				</ShortcutTarget>
+			</WashTooltip>
 		{/snippet}
 
-		<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
-			<thead class="bg-base-100 sticky top-0 z-10">
+		<table class="table w-full table-zebra [&_tbody_tr]:hover:bg-primary/40">
+			<thead class="sticky top-0 z-10 bg-base-100">
 				<tr>
 					<th>Actions</th>
 					<th>No</th>
@@ -228,7 +246,7 @@
 					<th>
 						<input
 							type="text"
-							class="input input-xs input-bordered w-full max-w-[10rem] cursor-text"
+							class="input-bordered input w-full max-w-[10rem] cursor-text input-xs"
 							placeholder="Filter…"
 							aria-label="Filter by contact"
 							bind:value={emailFilter}
@@ -237,7 +255,7 @@
 					<th>
 						<input
 							type="text"
-							class="input input-xs input-bordered w-full max-w-[8rem] cursor-text"
+							class="input-bordered input w-full max-w-[8rem] cursor-text input-xs"
 							placeholder="Filter…"
 							aria-label="Filter by business"
 							bind:value={businessFilter}
@@ -275,14 +293,18 @@
 					</tr>
 				{:else}
 					{#each pageRows as r, i (r.id)}
-						<tr>
+						<tr
+							data-kbd-row-id={r.id}
+							data-kbd-row-slot={String(i + 1)}
+							data-kbd-row-focus={keyboardRowIndex === i ? 'true' : undefined}
+						>
 							<td>
 								<div class="flex items-center gap-0.5">
 									{#if r.status === 'pending'}
 										<IconActionTip tip="Approve" tone="success">
-<button
+											<button
 												type="button"
-												class="btn btn-ghost btn-square btn-xs btn-success cursor-pointer"
+												class="btn btn-square cursor-pointer btn-ghost btn-success btn-xs"
 												aria-label="Approve"
 												onclick={() => openApprove(r)}
 											>
@@ -302,9 +324,9 @@
 										>
 											<input type="hidden" name="requestId" value={r.id} />
 											<IconActionTip tip="Reject" tone="warning">
-<button
+												<button
 													type="submit"
-													class="btn btn-ghost btn-square btn-xs btn-warning"
+													class="btn btn-square btn-ghost btn-warning btn-xs"
 													class:cursor-pointer={busyId !== r.id}
 													class:cursor-not-allowed={busyId === r.id}
 													class:loading={busyId === r.id}
@@ -317,20 +339,20 @@
 													{/if}
 												</button>
 											</IconActionTip>
-
 										</form>
 									{/if}
-									<IconActionTip tip="Delete" tone="error">
-<button
-											type="button"
-											class="btn btn-ghost btn-square btn-xs btn-error cursor-pointer"
-											aria-label="Delete"
-											onclick={() => openDelete(r)}
-										>
-											<Trash2 class="size-3.5" aria-hidden="true" />
-										</button>
-									</IconActionTip>
-
+									<WashActionKbd key="d">
+										<IconActionTip tip="Delete" tone="error">
+											<button
+												type="button"
+												class="btn btn-square cursor-pointer btn-ghost btn-error btn-xs"
+												aria-label="Delete"
+												onclick={() => openDelete(r)}
+											>
+												<Trash2 class="size-3.5" aria-hidden="true" />
+											</button>
+										</IconActionTip>
+									</WashActionKbd>
 								</div>
 							</td>
 							<td>{(safePage - 1) * pageSize + i + 1}</td>
@@ -346,9 +368,7 @@
 							</td>
 							<td>{trialDurationLabel(r.duration)}</td>
 							<td><span class={statusBadge(r.status)}>{r.status}</span></td>
-							<td class="text-ink-muted whitespace-nowrap text-sm"
-								>{shortDateTime(r.createdAt)}</td
-							>
+							<td class="text-ink-muted text-sm whitespace-nowrap">{shortDateTime(r.createdAt)}</td>
 						</tr>
 					{/each}
 				{/if}
@@ -380,7 +400,7 @@
 			<div class="join">
 				<button
 					type="button"
-					class="btn btn-sm join-item"
+					class="btn join-item btn-sm"
 					class:cursor-pointer={safePage > 1}
 					class:cursor-not-allowed={safePage <= 1}
 					disabled={safePage <= 1}
@@ -391,7 +411,7 @@
 				{#each pageButtons as p (p)}
 					<button
 						type="button"
-						class="btn btn-sm join-item cursor-pointer"
+						class="btn join-item cursor-pointer btn-sm"
 						class:btn-active={p === safePage}
 						onclick={() => (page = p)}
 					>
@@ -400,7 +420,7 @@
 				{/each}
 				<button
 					type="button"
-					class="btn btn-sm join-item"
+					class="btn join-item btn-sm"
 					class:cursor-pointer={safePage < totalPages}
 					class:cursor-not-allowed={safePage >= totalPages}
 					disabled={safePage >= totalPages}
@@ -414,27 +434,30 @@
 </div>
 
 <dialog bind:this={approveDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-lg border bg-base-100 shadow-sm">
-		<h2 class="card-title text-primary font-bold">Approve trial</h2>
+	<div class="modal-box w-11/12 max-w-lg border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="card-title font-bold text-primary">Approve trial</h2>
 		{#if approveRow}
 			<p class="text-ink-muted mt-1 text-sm">
-				Create business <span class="text-base-content font-medium">{approveRow.businessName}</span>
-				and invite owner <span class="text-base-content font-medium">{approveRow.email}</span>
+				Create business <span class="font-medium text-base-content">{approveRow.businessName}</span>
+				and invite owner <span class="font-medium text-base-content">{approveRow.email}</span>
 				for {trialDurationLabel(approveRow.duration)}.
 			</p>
 			<form
 				method="POST"
 				action="?/approveTrial"
 				class="mt-4 flex flex-col gap-3"
-				use:enhance={bindSubmitting((v) => (approving = v), async ({ result, update }) => {
-					await update();
-					if (result.type === 'success') closeApprove();
-				})}
+				use:enhance={bindSubmitting(
+					(v) => (approving = v),
+					async ({ result, update }) => {
+						await update();
+						if (result.type === 'success') closeApprove();
+					}
+				)}
 			>
 				<input type="hidden" name="requestId" value={approveRow.id} />
 				<label class="form-control flex w-full flex-col" for="approve-template">
 					<span class="label-text mb-1">
-						Template<span class="text-error align-top text-sm leading-none" aria-hidden="true"
+						Template<span class="align-top text-sm leading-none text-error" aria-hidden="true"
 							>*</span
 						>
 					</span>
@@ -496,21 +519,24 @@
 </dialog>
 
 <dialog bind:this={deleteDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-md border bg-base-100 shadow-sm">
-		<h2 class="card-title text-error font-bold">Delete trial request</h2>
+	<div class="modal-box w-11/12 max-w-md border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="card-title font-bold text-error">Delete trial request</h2>
 		{#if deleteRow}
 			<p class="text-ink-muted mt-2 text-sm">
 				Permanently delete the request from
-				<span class="text-base-content font-medium">{deleteRow.email}</span>?
+				<span class="font-medium text-base-content">{deleteRow.email}</span>?
 			</p>
 			<form
 				method="POST"
 				action="?/deleteTrial"
 				class="modal-action justify-end"
-				use:enhance={bindSubmitting((v) => (deleting = v), async ({ result, update }) => {
-					await update();
-					if (result.type === 'success') closeDelete();
-				})}
+				use:enhance={bindSubmitting(
+					(v) => (deleting = v),
+					async ({ result, update }) => {
+						await update();
+						if (result.type === 'success') closeDelete();
+					}
+				)}
 			>
 				<input type="hidden" name="requestId" value={deleteRow.id} />
 				<button

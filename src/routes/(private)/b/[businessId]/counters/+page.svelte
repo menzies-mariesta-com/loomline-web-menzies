@@ -16,10 +16,16 @@
 	import { bindSubmitting } from '#lib/tool/form-submit';
 	import { shortDateTime } from '#lib/util/format';
 	import DataTableShell from '#lib/component/own/local/private/data-table/DataTableShell.svelte';
+	import { buildCrudRowActions } from '#lib/keyboard/table-actions';
+
 	import SearchSelect from '#lib/component/own/local/private/SearchSelect.svelte';
 	import ToastDismissButton from '#lib/component/own/local/private/ToastDismissButton.svelte';
 	import IconActionTip from '#lib/component/wash/tooltip/IconActionTip.svelte';
 	import WashTooltip from '#lib/component/wash/tooltip/WashTooltip.svelte';
+	import WashActionKbd from '#lib/component/own/local/keyboard/WashActionKbd.svelte';
+	import ShortcutTarget from '#lib/component/own/local/keyboard/ShortcutTarget.svelte';
+	import { registerDataTableHeaderShortcuts } from '#lib/keyboard/page-table-shortcuts';
+	import { m } from '#lib/paraglide/messages';
 
 	let { data, form } = $props();
 
@@ -79,6 +85,9 @@
 	const totalPages = $derived(Math.max(1, Math.ceil(filtered.length / pageSize)));
 	const safePage = $derived(Math.min(page, totalPages));
 	const pageRows = $derived(filtered.slice((safePage - 1) * pageSize, safePage * pageSize));
+	let keyboardRowIndex = $state<number | null>(null);
+	const tableRowActions = $derived(buildCrudRowActions({ onEdit: openEdit, onDelete: openDelete }));
+
 	const showingFrom = $derived(filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1);
 	const showingTo = $derived(Math.min(safePage * pageSize, filtered.length));
 	const footerSummary = $derived(
@@ -134,9 +143,7 @@
 	function openCreate() {
 		createSiteId = data.sites[0]?.id ?? '';
 		createDeptId =
-			data.departments.find((d) => d.siteId === createSiteId)?.id ??
-			data.departments[0]?.id ??
-			'';
+			data.departments.find((d) => d.siteId === createSiteId)?.id ?? data.departments[0]?.id ?? '';
 		createServiceIds = [];
 		createDialog?.showModal();
 	}
@@ -158,6 +165,15 @@
 		if (on) return list.includes(id) ? list : [...list, id];
 		return list.filter((x) => x !== id);
 	}
+
+	$effect(() => {
+		const off = registerDataTableHeaderShortcuts('counters', {
+			onRefresh: () => void handleRefresh(),
+			refreshDisabled: () => refreshing,
+			onNew: openCreate
+		});
+		return off;
+	});
 </script>
 
 <svelte:head>
@@ -166,7 +182,7 @@
 </svelte:head>
 
 {#if form?.message && !toastGone}
-	<div class="toast toast-bottom toast-end z-[100]">
+	<div class="toast toast-end toast-bottom z-[100]">
 		<div
 			class="alert shadow-lg"
 			class:alert-success={form.success}
@@ -184,40 +200,52 @@
 {/if}
 
 <div class="flex min-h-0 flex-1 flex-col">
-	<DataTableShell title="Counters" bind:bodyEl footerSummary={footerSummary}>
+	<DataTableShell
+		keyboardRows={pageRows}
+		rowActions={tableRowActions}
+		tableId="counters"
+		bind:keyboardRowIndex
+		title="Counters"
+		bind:bodyEl
+		{footerSummary}
+	>
 		{#snippet headerActions()}
 			<WashTooltip tooltipText="Refresh" className="tooltip-secondary">
-<button
-					type="button"
-					class="btn btn-ghost btn-square btn-sm btn-secondary"
-					class:cursor-pointer={!refreshing}
-					class:cursor-not-allowed={refreshing}
-					class:btn-disabled={refreshing}
-					class:loading={refreshing}
-					aria-label="Refresh"
-					aria-busy={refreshing}
-					disabled={refreshing}
-					onclick={() => void handleRefresh()}
-				>
-					{#if !refreshing}
-						<RefreshCw class="size-4" aria-hidden="true" />
-					{/if}
-				</button>
-</WashTooltip>
+				<ShortcutTarget keys={['R']} label={m.keyboard_action_refresh()}>
+					<button
+						type="button"
+						class="btn btn-square btn-ghost btn-secondary btn-sm"
+						class:cursor-pointer={!refreshing}
+						class:cursor-not-allowed={refreshing}
+						class:btn-disabled={refreshing}
+						class:loading={refreshing}
+						aria-label="Refresh"
+						aria-busy={refreshing}
+						disabled={refreshing}
+						onclick={() => void handleRefresh()}
+					>
+						{#if !refreshing}
+							<RefreshCw class="size-4" aria-hidden="true" />
+						{/if}
+					</button>
+				</ShortcutTarget>
+			</WashTooltip>
 			<WashTooltip tooltipText="Add" className="tooltip-primary">
-<button
-					type="button"
-					class="btn btn-ghost btn-square btn-sm btn-primary cursor-pointer"
-					aria-label="Add"
-					onclick={openCreate}
-				>
-					<Plus class="size-4" aria-hidden="true" />
-				</button>
-</WashTooltip>
+				<ShortcutTarget keys={['N']} label={m.keyboard_action_new()}>
+					<button
+						type="button"
+						class="btn btn-square cursor-pointer btn-ghost btn-primary btn-sm"
+						aria-label="Add"
+						onclick={openCreate}
+					>
+						<Plus class="size-4" aria-hidden="true" />
+					</button>
+				</ShortcutTarget>
+			</WashTooltip>
 		{/snippet}
 
-		<table class="table table-zebra w-full [&_tbody_tr]:hover:bg-primary/40">
-			<thead class="bg-base-100 sticky top-0 z-10">
+		<table class="table w-full table-zebra [&_tbody_tr]:hover:bg-primary/40">
+			<thead class="sticky top-0 z-10 bg-base-100">
 				<tr>
 					<th>Actions</th>
 					<th>No</th>
@@ -234,7 +262,7 @@
 					<th>
 						<input
 							type="text"
-							class="input input-xs input-bordered w-full max-w-[10rem] cursor-text"
+							class="input-bordered input w-full max-w-[10rem] cursor-text input-xs"
 							placeholder="Filter…"
 							aria-label="Filter by name"
 							bind:value={nameFilter}
@@ -272,25 +300,27 @@
 					</tr>
 				{:else}
 					{#each pageRows as c, i (c.id)}
-						<tr>
+						<tr
+							data-kbd-row-id={c.id}
+							data-kbd-row-slot={String(i + 1)}
+							data-kbd-row-focus={keyboardRowIndex === i ? 'true' : undefined}
+						>
 							<td>
 								<div class="flex flex-wrap items-center gap-0.5">
-									<IconActionTip tip="Edit" tone="secondary">
-										<button
-											type="button"
-											class="btn btn-ghost btn-square btn-xs btn-secondary cursor-pointer"
-											aria-label="Edit"
-											onclick={() => openEdit(c)}
-										>
-											<Pencil class="size-3.5" aria-hidden="true" />
-										</button>
-									</IconActionTip>
+									<WashActionKbd key="e">
+										<IconActionTip tip="Edit" tone="secondary">
+											<button
+												type="button"
+												class="btn btn-square cursor-pointer btn-ghost btn-secondary btn-xs"
+												aria-label="Edit"
+												onclick={() => openEdit(c)}
+											>
+												<Pencil class="size-3.5" aria-hidden="true" />
+											</button>
+										</IconActionTip>
+									</WashActionKbd>
 
-									{#each [
-										{ st: 'open', tip: 'Set open', tone: 'success', Icon: DoorOpen },
-										{ st: 'paused', tip: 'Set paused', tone: 'warning', Icon: Pause },
-										{ st: 'closed', tip: 'Set closed', tone: 'secondary', Icon: DoorClosed }
-									] as { st, tip, tone, Icon }}
+									{#each [{ st: 'open', tip: 'Set open', tone: 'success', Icon: DoorOpen }, { st: 'paused', tip: 'Set paused', tone: 'warning', Icon: Pause }, { st: 'closed', tip: 'Set closed', tone: 'secondary', Icon: DoorClosed }] as { st, tip, tone, Icon }}
 										<form
 											method="POST"
 											action="?/setStatus"
@@ -301,7 +331,7 @@
 											<IconActionTip {tip} {tone}>
 												<button
 													type="submit"
-													class="btn btn-ghost btn-square btn-xs cursor-pointer"
+													class="btn btn-square cursor-pointer btn-ghost btn-xs"
 													class:btn-primary={c.status === st}
 													class:loading={statusBusy === c.id}
 													class:cursor-not-allowed={statusBusy === c.id}
@@ -316,24 +346,28 @@
 											</IconActionTip>
 										</form>
 									{/each}
-									<IconActionTip tip="Delete" tone="error">
-										<button
-											type="button"
-											class="btn btn-ghost btn-square btn-xs btn-error cursor-pointer"
-											aria-label="Delete"
-											onclick={() => openDelete(c)}
-										>
-											<Trash2 class="size-3.5" aria-hidden="true" />
-										</button>
-									</IconActionTip>
-
+									<WashActionKbd key="d">
+										<IconActionTip tip="Delete" tone="error">
+											<button
+												type="button"
+												class="btn btn-square cursor-pointer btn-ghost btn-error btn-xs"
+												aria-label="Delete"
+												onclick={() => openDelete(c)}
+											>
+												<Trash2 class="size-3.5" aria-hidden="true" />
+											</button>
+										</IconActionTip>
+									</WashActionKbd>
 								</div>
 							</td>
 							<td>{(safePage - 1) * pageSize + i + 1}</td>
 							<td class="font-medium">{c.label}</td>
 							<td>{c.department?.name ?? '-'}</td>
 							<td class="max-w-[12rem] truncate text-sm">
-								{c.services.map((s) => s.service?.name).filter(Boolean).join(', ') || '-'}
+								{c.services
+									.map((s) => s.service?.name)
+									.filter(Boolean)
+									.join(', ') || '-'}
 							</td>
 							<td>
 								<span
@@ -372,21 +406,21 @@
 			<div class="join">
 				<button
 					type="button"
-					class="btn btn-xs join-item cursor-pointer"
+					class="btn join-item cursor-pointer btn-xs"
 					disabled={safePage <= 1}
 					onclick={() => (page = safePage - 1)}>Prev</button
 				>
 				{#each pageButtons as p}
 					<button
 						type="button"
-						class="btn btn-xs join-item cursor-pointer"
+						class="btn join-item cursor-pointer btn-xs"
 						class:btn-active={p === safePage}
 						onclick={() => (page = p)}>{p}</button
 					>
 				{/each}
 				<button
 					type="button"
-					class="btn btn-xs join-item cursor-pointer"
+					class="btn join-item cursor-pointer btn-xs"
 					disabled={safePage >= totalPages}
 					onclick={() => (page = safePage + 1)}>Next</button
 				>
@@ -396,8 +430,8 @@
 </div>
 
 <dialog bind:this={createDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-lg border bg-base-100 shadow-sm">
-		<h2 class="card-title text-primary mb-4 font-bold">Add counter</h2>
+	<div class="modal-box w-11/12 max-w-lg border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="mb-4 card-title font-bold text-primary">Add counter</h2>
 		<form
 			method="POST"
 			action="?/create"
@@ -412,14 +446,14 @@
 		>
 			<label class="form-control w-full" for="c-label">
 				<span class="label-text mb-1"
-					>Label<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span
+					>Label<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 					></span
 				>
-				<input id="c-label" name="label" class="input input-bordered w-full cursor-text" required />
+				<input id="c-label" name="label" class="input-bordered input w-full cursor-text" required />
 			</label>
 			<label class="form-control w-full" for="c-site">
 				<span class="label-text mb-1"
-					>Site<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span
+					>Site<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 					></span
 				>
 				<SearchSelect
@@ -432,7 +466,7 @@
 			</label>
 			<label class="form-control w-full" for="c-dept">
 				<span class="label-text mb-1"
-					>Department<span class="text-error align-top text-sm leading-none" aria-hidden="true"
+					>Department<span class="align-top text-sm leading-none text-error" aria-hidden="true"
 						>*</span
 					></span
 				>
@@ -444,7 +478,7 @@
 					required
 				/>
 			</label>
-			<fieldset class="border-base-300 rounded-box border p-3">
+			<fieldset class="rounded-box border border-base-300 p-3">
 				<legend class="px-1 text-sm font-medium">Services (optional)</legend>
 				<div class="flex max-h-40 flex-col gap-1 overflow-y-auto">
 					{#each data.services as s}
@@ -489,8 +523,8 @@
 </dialog>
 
 <dialog bind:this={editDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-lg border bg-base-100 shadow-sm">
-		<h2 class="card-title text-secondary mb-4 font-bold">Edit counter</h2>
+	<div class="modal-box w-11/12 max-w-lg border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="mb-4 card-title font-bold text-secondary">Edit counter</h2>
 		{#if editRow}
 			<form
 				method="POST"
@@ -507,20 +541,20 @@
 				<input type="hidden" name="id" value={editRow.id} />
 				<label class="form-control w-full" for="edit-c-label">
 					<span class="label-text mb-1"
-						>Label<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span
+						>Label<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 						></span
 					>
 					<input
 						id="edit-c-label"
 						name="label"
-						class="input input-bordered w-full cursor-text"
+						class="input-bordered input w-full cursor-text"
 						value={editRow.label}
 						required
 					/>
 				</label>
 				<label class="form-control w-full" for="edit-c-site">
 					<span class="label-text mb-1"
-						>Site<span class="text-error align-top text-sm leading-none" aria-hidden="true">*</span
+						>Site<span class="align-top text-sm leading-none text-error" aria-hidden="true">*</span
 						></span
 					>
 					<SearchSelect
@@ -533,7 +567,7 @@
 				</label>
 				<label class="form-control w-full" for="edit-c-dept">
 					<span class="label-text mb-1"
-						>Department<span class="text-error align-top text-sm leading-none" aria-hidden="true"
+						>Department<span class="align-top text-sm leading-none text-error" aria-hidden="true"
 							>*</span
 						></span
 					>
@@ -545,7 +579,7 @@
 						required
 					/>
 				</label>
-				<fieldset class="border-base-300 rounded-box border p-3">
+				<fieldset class="rounded-box border border-base-300 p-3">
 					<legend class="px-1 text-sm font-medium">Services (optional)</legend>
 					<div class="flex max-h-40 flex-col gap-1 overflow-y-auto">
 						{#each data.services as s}
@@ -591,8 +625,8 @@
 </dialog>
 
 <dialog bind:this={deleteDialog} class="modal">
-	<div class="modal-box w-11/12 border-base-300 max-w-md border bg-base-100 shadow-sm">
-		<h2 class="card-title text-error mb-2 font-bold">Delete counter</h2>
+	<div class="modal-box w-11/12 max-w-md border border-base-300 bg-base-100 shadow-sm">
+		<h2 class="mb-2 card-title font-bold text-error">Delete counter</h2>
 		<p class="text-sm opacity-70">Delete <strong>{deleteRow?.label}</strong>?</p>
 		{#if deleteRow}
 			<form
